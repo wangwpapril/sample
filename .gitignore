@@ -1,8 +1,8 @@
-.gradle
+TestApplication/.gradle/
 /local.properties
 /.idea/workspace.xml
 /.idea/libraries
 .DS_Store
-/build
+TestApplication/build
 workspace.xml
 *.idea
