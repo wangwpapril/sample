@@ -3,19 +3,13 @@ package com.tenone.testapplication.isakmp;
 import android.util.Log;
 
 import org.spongycastle.crypto.InvalidCipherTextException;
-import org.spongycastle.crypto.digests.SHA256Digest;
 import org.spongycastle.crypto.engines.AESEngine;
-import org.spongycastle.crypto.generators.PKCS5S2ParametersGenerator;
 import org.spongycastle.crypto.modes.CBCBlockCipher;
 import org.spongycastle.crypto.paddings.PaddedBufferedBlockCipher;
 import org.spongycastle.crypto.params.KeyParameter;
 import org.spongycastle.crypto.params.ParametersWithIV;
 
-import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
-import java.security.AlgorithmParameterGenerator;
-import java.security.AlgorithmParameters;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
@@ -23,29 +17,16 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.InvalidParameterSpecException;
-import java.security.spec.X509EncodedKeySpec;
 import java.util.Random;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyAgreement;
-import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.crypto.interfaces.DHPublicKey;
 import javax.crypto.spec.DHParameterSpec;
 import javax.crypto.spec.DHPublicKeySpec;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 
 public class KeyExchangeUtil {
@@ -66,7 +47,10 @@ public class KeyExchangeUtil {
     private byte[] mSKEYIDa;
     private byte[] mSKEYIDe;
     private byte[] mIv;
+    private String mHashAlgorithm;
+    private String mEncryptAlgorithm;
 
+    /* RFC3526. 2048 bit MODP group*/
     private static final String modp2048 = (
             "FFFFFFFF FFFFFFFF C90FDAA2 2168C234 C4C6628B 80DC1CD1" +
                     "29024E08 8A67CC74 020BBEA6 3B139B22 514A0879 8E3404DD" +
@@ -95,27 +79,28 @@ public class KeyExchangeUtil {
         mPreSharedSecret = preSharedKey;
     }
 
+    public void setHashAlgorithm(String hashAlgorithm) {
+        mHashAlgorithm = hashAlgorithm;
+    }
+
+    public void setmEncryptAlgorithm(String encryptAlgorithm) {
+        mEncryptAlgorithm = encryptAlgorithm;
+    }
+
     public boolean generatePairKeys(String preSharedSecret) {
         DHParameterSpec parameterSpec;
 
         try {
             generateRandomNumbers();
-            //AlgorithmParameterGenerator parameterGenerator = AlgorithmParameterGenerator.getInstance("DH");
-            //parameterGenerator.init(2048);
-//            AlgorithmParameters parameters = parameterGenerator.generateParameters();
-//            parameterSpec = parameters.getParameterSpec(DHParameterSpec.class);
-
             parameterSpec = new DHParameterSpec(mDH_P, mDH_G);
 
 
             KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH");
             keyPairGenerator.initialize(parameterSpec, new SecureRandom());
-            //keyPairGenerator.initialize(2048);
             keyPairGenerator.initialize(parameterSpec);
             mKeyPair = keyPairGenerator.generateKeyPair();
             mKeyAgree = KeyAgreement.getInstance("DH");
             mKeyAgree.init(mKeyPair.getPrivate());
-            //mDH_P = parameterSpec.getP();
 
         } catch (NoSuchAlgorithmException | InvalidKeyException |  IllegalArgumentException | InvalidAlgorithmParameterException e) {
             e.printStackTrace();
@@ -144,6 +129,13 @@ public class KeyExchangeUtil {
         return mNonce;
     }
 
+    /**
+     * Initiate the server's DH public key into the keyAgreement, then generates the shared-secret
+     * which shall be same on both parties (our client and VPN server)
+     *
+     * @param serverPublicKeyData
+     * @return
+     */
     public boolean instantiateServerPublicKey(byte[] serverPublicKeyData) {
         try {
             KeyFactory keyFactory = KeyFactory.getInstance("DH");
@@ -151,8 +143,6 @@ public class KeyExchangeUtil {
             BigInteger pubKeyBI = new BigInteger(1, serverPublicKeyData);
             PublicKey serverPublicKey = keyFactory.generatePublic(new DHPublicKeySpec(pubKeyBI, mDH_P, mDH_G));
 
-            //X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(serverPublicKeyData);
-            //PublicKey serverPublicKey = keyFactory.generatePublic(x509KeySpec);
             mKeyAgree.doPhase(serverPublicKey, true);
 
             mSharedSecret = mKeyAgree.generateSecret();
@@ -167,6 +157,12 @@ public class KeyExchangeUtil {
         return false;
     }
 
+    /**
+     * Generates the derivation key, authentication key, encryption key, etc.
+     * @param responderNonce
+     * @param initiatorCookie
+     * @param responderCookie
+     */
     public void generateExchangeInfo(byte[] responderNonce, byte[] initiatorCookie, byte[] responderCookie) {
 
         prepareSKEYID(responderNonce);
@@ -175,6 +171,10 @@ public class KeyExchangeUtil {
         prepareSKEYIDe(initiatorCookie, responderCookie);
     }
 
+    /**
+     * Get the DH shared secret
+     * @return
+     */
     public byte[] getSharedSecret() {
         if (mKeyAgree == null) {
             return null;
@@ -187,319 +187,199 @@ public class KeyExchangeUtil {
         return mSharedSecret;
     }
 
+    /**
+     * Prepare SKEYID. RFC2409. https://tools.ietf.org/html/rfc2409
+     * SKEYID = prf(pre-shared-key, Ni_b | Nr_b)
+     *
+     * @param responderNonce
+     */
     public void prepareSKEYID(byte[] responderNonce) {
 
-//        if (mSKEYID != null){
-//            return;
-//        }
+        byte[] initiatorNonceBytes = mNonce.toByteArray();
+        byte[] inputData = new byte[initiatorNonceBytes.length + responderNonce.length];
+        System.arraycopy(mNonce.toByteArray(), 0, inputData, 0, initiatorNonceBytes.length);
+        System.arraycopy(responderNonce, 0, inputData, initiatorNonceBytes.length, responderNonce.length);
 
         try {
-            Mac sha256_HAMC = Mac.getInstance("HmacSHA256");
+            mSKEYID = hashDataWithKey(mPreSharedSecret.getBytes("UTF-8"), inputData);
 
-            SecretKeySpec secretKeySpec = new SecretKeySpec(mPreSharedSecret.getBytes("UTF-8"), "HmacSHA256");
-            sha256_HAMC.init(secretKeySpec);
-
-            byte[] byteInitiatorNonce = mNonce.toByteArray();
-            sha256_HAMC.update(byteInitiatorNonce);
-            sha256_HAMC.update(responderNonce);
-            mSKEYID = sha256_HAMC.doFinal();
-            sha256_HAMC.reset();
-
-            print("Nonce (initiator)", byteInitiatorNonce);
+            print("Nonce (initiator)", initiatorNonceBytes);
             print("Nonce (responder)", responderNonce);
             print("SKEYID: ", mSKEYID);
-
-//            byte[] data = new byte[byteInitiatorNonce.length + responderNonce.length];
-//            System.arraycopy(byteInitiatorNonce, 0, data, 0, byteInitiatorNonce.length);
-//            System.arraycopy(responderNonce, 0, data, byteInitiatorNonce.length, responderNonce.length);
-//            mSKEYID = sha256_HAMC.doFinal(data);
-//            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-//            digest.update(mPreSharedSecret.getBytes("UTF-8"));
-//            digest.update(mNonce.toByteArray());
-//            digest.update(responderNonce);
-//            mSKEYID = digest.digest();
-
 
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * Prepare SKEYID_d. RFC2409. https://tools.ietf.org/html/rfc2409
+     * SKEYID_d = prf(SKEYID, g^xy | CKY-I | CKY-R | 0)
+     *
+     * @param initiatorCookie
+     * @param responderCookie
+     */
     public void prepareSKEYIDd(byte[] initiatorCookie, byte[] responderCookie) {
         if (mSKEYID == null || mSharedSecret == null) {
             return;
         }
 
-        try {
-            Mac sha256_HAMC = Mac.getInstance("HmacSHA256");
+        byte[] inputData = new byte[mSharedSecret.length + initiatorCookie.length + responderCookie.length + 1];
+        System.arraycopy(mSharedSecret, 0, inputData, 0, mSharedSecret.length);
+        System.arraycopy(initiatorCookie, 0, inputData, mSharedSecret.length, initiatorCookie.length);
+        System.arraycopy(responderCookie, 0, inputData, mSharedSecret.length + initiatorCookie.length,
+                responderCookie.length);
+        //System.arraycopy(Utils.toBytes(0, 1), 0, inputData, mSharedSecret.length + initiatorCookie.length + responderCookie.length, 1);
+        mSKEYIDd = hashDataWithKey(mSKEYID, inputData);
 
-            SecretKeySpec secretKeySpec = new SecretKeySpec(mSKEYID, "HmacSHA256");
-            sha256_HAMC.init(secretKeySpec);
+        print("Initiator cookie", initiatorCookie);
+        print("responder cookie", responderCookie);
+        print("SKEYID_d", mSKEYIDd);
 
-            sha256_HAMC.update(mSharedSecret);
-            sha256_HAMC.update(initiatorCookie);
-            sha256_HAMC.update(responderCookie);
-            sha256_HAMC.update(new byte[1]);
-
-            mSKEYIDd = sha256_HAMC.doFinal();
-            sha256_HAMC.reset();
-
-            print("Initiator cookie", initiatorCookie);
-            print("responder cookie", responderCookie);
-            print("SKEYID_d", mSKEYIDd);
-//
-//            byte[] data = new byte[mSharedSecret.length + initiatorCookie.length + responderCookie.length + 1];
-//
-//            System.arraycopy(mSharedSecret, 0, data, 0, mSharedSecret.length);
-//            System.arraycopy(initiatorCookie, 0, data, mSharedSecret.length, initiatorCookie.length);
-//            System.arraycopy(responderCookie, 0, data, mSharedSecret.length + initiatorCookie.length, responderCookie.length);
-//            System.arraycopy(Utils.toBytes(0, 1), 0, data, data.length - 1, 1);
-//
-//            mSKEYIDd = sha256_HAMC.doFinal(data);
-//            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-//            digest.update(mSKEYID);
-//            digest.update(mSharedSecret);
-//            digest.update(initiatorCookie);
-//            digest.update(responderCookie);
-//            digest.update(Utils.toBytes(0, 1));
-//            mSKEYIDd = digest.digest();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
+    /**
+     * Prepare SKEYID_a. RFC2409. https://tools.ietf.org/html/rfc2409
+     * SKEYID_a = prf(SKEYID, SKEYID_d | g^xy | CKY-I | CKY-R | 1)
+     *
+     * @param initiatorCookie
+     * @param responderCookie
+     */
     public void prepareSKEYIDa(byte[] initiatorCookie, byte[] responderCookie) {
         if (mSKEYID == null || mSharedSecret == null || mSKEYIDd == null) {
             return;
         }
 
-        try {
-            Mac sha256_HAMC = Mac.getInstance("HmacSHA256");
+        byte[] inputData = new byte[mSKEYIDd.length + mSharedSecret.length + initiatorCookie.length + responderCookie.length + 1];
+        System.arraycopy(mSKEYIDd, 0, inputData, 0, mSKEYIDd.length);
+        System.arraycopy(mSharedSecret, 0, inputData, mSKEYIDd.length, mSharedSecret.length);
+        System.arraycopy(initiatorCookie, 0, inputData, mSKEYIDd.length + mSharedSecret.length, initiatorCookie.length);
+        System.arraycopy(responderCookie, 0, inputData,
+                mSKEYIDd.length + mSharedSecret.length + initiatorCookie.length, responderCookie.length);
+        System.arraycopy(Utils.toBytes(1, 1), 0, inputData,
+                mSKEYIDd.length + mSharedSecret.length + initiatorCookie.length + responderCookie.length, 1);
 
-            SecretKeySpec secretKeySpec = new SecretKeySpec(mSKEYID, "HmacSHA256");
-            sha256_HAMC.init(secretKeySpec);
+        mSKEYIDa = hashDataWithKey(mSKEYID, inputData);
 
-            sha256_HAMC.update(mSKEYIDd);
-            sha256_HAMC.update(mSharedSecret);
-            sha256_HAMC.update(initiatorCookie);
-            sha256_HAMC.update(responderCookie);
-            sha256_HAMC.update(Utils.toBytes(1, 1));
-
-            mSKEYIDa = sha256_HAMC.doFinal();
-            sha256_HAMC.reset();
-
-            print("SKEYID_a", mSKEYIDa);
-//
-//            byte[] data = new byte[mSKEYIDd.length + mSharedSecret.length + initiatorCookie.length + responderCookie.length + 1];
-//
-//            System.arraycopy(mSKEYIDd, 0, data, 0, mSKEYIDd.length);
-//            System.arraycopy(mSharedSecret, 0, data, mSKEYIDd.length, mSharedSecret.length);
-//            System.arraycopy(initiatorCookie, 0, data, mSKEYIDd.length + mSharedSecret.length, initiatorCookie.length);
-//            System.arraycopy(responderCookie, 0, data, mSKEYIDd.length + mSharedSecret.length + initiatorCookie.length,
-//                    responderCookie.length);
-//            System.arraycopy(Utils.toBytes(1, 1), 0, data, data.length - 1, 1);
-//
-//            mSKEYIDa = sha256_HAMC.doFinal(data);
-
-//            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-//            digest.update(mSKEYIDd);
-//            digest.update(mSharedSecret);
-//            digest.update(initiatorCookie);
-//            digest.update(responderCookie);
-//            digest.update(Utils.toBytes(0, 1));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        print("SKEYID_a", mSKEYIDa);
     }
 
+    /**
+     * Prepare SKEYID_e. RFC2409. https://tools.ietf.org/html/rfc2409
+     * SKEYID_e = prf(SKEYID, SKEYID_a | g^xy | CKY-I | CKY-R | 2)
+     *
+     * @param initiatorCookie
+     * @param responderCookie
+     */
     public void prepareSKEYIDe(byte[] initiatorCookie, byte[] responderCookie) {
         if (mSKEYID == null || mSharedSecret == null || mSKEYIDa == null) {
             return;
         }
 
-        try {
-            Mac sha256_HAMC = Mac.getInstance("HmacSHA256");
+        byte[] inputData = new byte[mSKEYIDa.length + mSharedSecret.length + initiatorCookie.length + responderCookie.length + 1];
+        System.arraycopy(mSKEYIDa, 0, inputData, 0, mSKEYIDa.length);
+        System.arraycopy(mSharedSecret, 0, inputData, mSKEYIDa.length, mSharedSecret.length);
+        System.arraycopy(initiatorCookie, 0, inputData, mSKEYIDa.length + mSharedSecret.length, initiatorCookie.length);
+        System.arraycopy(responderCookie, 0, inputData,
+                mSKEYIDa.length + mSharedSecret.length + initiatorCookie.length, responderCookie.length);
+        System.arraycopy(Utils.toBytes(2, 1), 0, inputData,
+                mSKEYIDa.length + mSharedSecret.length + initiatorCookie.length + responderCookie.length, 1);
 
-            SecretKeySpec secretKeySpec = new SecretKeySpec(mSKEYID, "HmacSHA256");
-            sha256_HAMC.init(secretKeySpec);
+        mSKEYIDe = hashDataWithKey(mSKEYID, inputData);
 
-            sha256_HAMC.update(mSKEYIDa);
-            sha256_HAMC.update(mSharedSecret);
-            sha256_HAMC.update(initiatorCookie);
-            sha256_HAMC.update(responderCookie);
-            sha256_HAMC.update(Utils.toBytes(2, 1));
+        print("SKEYID_e", mSKEYIDe);
 
-            mSKEYIDe = sha256_HAMC.doFinal();
-            sha256_HAMC.reset();
-
-            print("SKEYID_e", mSKEYIDe);
-
-//            byte[] data = new byte[mSKEYIDa.length + mSharedSecret.length + initiatorCookie.length + responderCookie.length + 1];
-//
-//            System.arraycopy(mSKEYIDa, 0, data, 0, mSKEYIDa.length);
-//            System.arraycopy(mSharedSecret, 0, data, mSKEYIDa.length, mSharedSecret.length);
-//            System.arraycopy(initiatorCookie, 0, data, mSKEYIDa.length + mSharedSecret.length, initiatorCookie.length);
-//            System.arraycopy(responderCookie, 0, data, mSKEYIDa.length + mSharedSecret.length + initiatorCookie.length,
-//                    responderCookie.length);
-//            System.arraycopy(Utils.toBytes(1, 1), 0, data, data.length - 1, 1);
-//
-//            mSKEYIDe = sha256_HAMC.doFinal(data);
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            e.printStackTrace();
-        }
     }
 
+    /**
+     * Prepare hash payload
+     * HASH_I = prf(SKEYID, g^xi | g^xr | CKY-I | CKY-R | SAi_b | IDii_b )
+     *
+     * @param initiatorPublicKey
+     * @param responderPublicKey
+     * @param initiatorCookie
+     * @param responderCookie
+     * @param saPayload
+     * @param idPayload
+     * @return
+     */
     public byte[] prepareHashPayloadData(byte[] initiatorPublicKey, byte[] responderPublicKey, byte[] initiatorCookie, byte[] responderCookie,
                                          byte[] saPayload, byte[] idPayload) {
 
-        try {
-            Mac sha256_HAMC = Mac.getInstance("HmacSHA256");
+        byte[] data = new byte[initiatorPublicKey.length + responderPublicKey.length +
+            initiatorCookie.length + responderCookie.length + saPayload.length - 4 + idPayload.length - 4];
 
-            SecretKeySpec secretKeySpec = new SecretKeySpec(mSKEYID, "HmacSHA256");
-            sha256_HAMC.init(secretKeySpec);
+        System.arraycopy(initiatorPublicKey, 0, data, 0, initiatorPublicKey.length);
+        System.arraycopy(responderPublicKey, 0, data, initiatorPublicKey.length, responderPublicKey.length);
+        System.arraycopy(initiatorCookie, 0, data,
+                initiatorPublicKey.length + responderPublicKey.length, initiatorCookie.length);
+        System.arraycopy(responderCookie, 0, data,
+                initiatorPublicKey.length + responderPublicKey.length + initiatorCookie.length, responderCookie.length);
+        System.arraycopy(saPayload, 4, data,
+                initiatorPublicKey.length + responderPublicKey.length + initiatorCookie.length + responderCookie.length,
+                saPayload.length - 4);
+        System.arraycopy(idPayload, 4, data,
+                initiatorPublicKey.length + responderPublicKey.length + initiatorCookie.length + responderCookie.length + saPayload.length - 4,
+                idPayload.length - 4);
 
-            sha256_HAMC.update(initiatorPublicKey);
-            sha256_HAMC.update(responderPublicKey);
-            sha256_HAMC.update(initiatorCookie);
-            sha256_HAMC.update(responderCookie);
-            sha256_HAMC.update(saPayload, 4, saPayload.length - 4);
-            sha256_HAMC.update(idPayload, 4, idPayload.length - 4);
+        byte[] hashData = hashDataWithKey(mSKEYID, data);
 
-            byte[] hashData = sha256_HAMC.doFinal();
+        print("HashData", hashData);
 
-            print("Initiator public key", initiatorPublicKey);
-            print("Responder public key", responderPublicKey);
-            print("Security authentication payload", saPayload);
-            print("Identification payload", idPayload);
-            print("HashData", hashData);
-
-            return hashData;
-
-//            byte[] data = new byte[initiatorPublicKey.length + responderPublicKey.length +
-//                    initiatorCookie.length + responderCookie.length + saPayload.length - 4 + idPayload.length - 4];
-//
-//            System.arraycopy(initiatorPublicKey, 0, data, 0, initiatorPublicKey.length);
-//            System.arraycopy(responderPublicKey, 0, data, initiatorPublicKey.length, responderPublicKey.length);
-//            System.arraycopy(initiatorCookie, 0, data, initiatorPublicKey.length + responderPublicKey.length, initiatorCookie.length);
-//            System.arraycopy(responderCookie, 0, data, initiatorPublicKey.length + responderPublicKey.length + initiatorCookie.length,
-//                    responderCookie.length);
-//            System.arraycopy(saPayload, 4, data, initiatorPublicKey.length + responderPublicKey.length + initiatorCookie.length +
-//                    responderCookie.length, saPayload.length - 4);
-//            System.arraycopy(idPayload, 4, data, initiatorPublicKey.length + responderPublicKey.length + initiatorCookie.length +
-//                    responderCookie.length + saPayload.length - 4, idPayload.length - 4);
-//
-//            return sha256_HAMC.doFinal(data);
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            e.printStackTrace();
-        }
-
-        return null;
+        return hashData;
     }
 
-    public byte[] encryptData(byte[] payloadData, byte[] serverPublicKey) {
-
+    public byte[] prepare1stEncryptedPayload(byte[] payloadData, byte[] serverPublicKey) {
         try {
-//            KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
-////            SecretKey secretKey = keyGenerator.generateKey();
-//            byte[] salts = new byte[16];
-//            SecureRandom secureRandom = new SecureRandom();
-//            secureRandom.nextBytes(salts);
-////            IvParameterSpec ivSpec = new IvParameterSpec(salts);
-////            SecretKeySpec secretKeySpec = new SecretKeySpec(mSKEYIDe, "AES");
-//
-//            //SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-//            //PBEKeySpec pbeKeySpec = new PBEKeySpec(new String(mSKEYIDe, "UTF-8").toCharArray(), salts, 65536, 256);
-//            PKCS5S2ParametersGenerator generator = new PKCS5S2ParametersGenerator(new SHA256Digest());
-//            generator.init(mSKEYIDe, salts, 65536);
-//            KeyParameter key = (KeyParameter)generator.generateDerivedParameters(256);
-//            SecretKeySpec secretKeySpec = new SecretKeySpec(key.getKey(), "AES");
-//
-//            //SecretKey secretKey = factory.generateSecret(pbeKeySpec);
-//            //SecretKeySpec secretKeySpec = new SecretKeySpec(secretKey.getEncoded(), "AES");
-//
-//            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-//            //cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, ivSpec);
-//            cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
-//
-//            mIv = cipher.getParameters().getParameterSpec(IvParameterSpec.class).getIV();
-//
-//            return cipher.doFinal(payloadData);
-
+            // first encrypted message using the IV from initiator's and responder's public keys
             byte[] data = new byte[serverPublicKey.length + getPublicKey().length];
             System.arraycopy(getPublicKey(), 0, data, 0, getPublicKey().length);
             System.arraycopy(serverPublicKey, 0, data, getPublicKey().length, serverPublicKey.length);
-            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            MessageDigest messageDigest = MessageDigest.getInstance(getHashProvider());
             messageDigest.update(data);
             byte[] ivBytes = messageDigest.digest();
             mIv = new byte[16];
             System.arraycopy(ivBytes, 0, mIv, 0, 16);
 
-            PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+            byte[] output = encryptData(payloadData);
 
-//            SecureRandom random = new SecureRandom();
-//            byte[] ivBytes = new byte[16];
-//            random.nextBytes(ivBytes);
+            print("Encrypted data", output);
 
-            cipher.init(true, new ParametersWithIV(new KeyParameter(mSKEYIDe), mIv));
-            byte[] outBuffer = new byte[cipher.getOutputSize(payloadData.length)];
+            return output;
 
-            int processed = cipher.processBytes(payloadData, 0, payloadData.length, outBuffer, 0);
-            processed += cipher.doFinal(outBuffer, processed);
-
-//            byte[] outBuffer2 = new byte[processed + 16];
-//            System.arraycopy(ivBytes, 0, outBuffer2, 0, 16);
-//            System.arraycopy(outBuffer, 0, outBuffer2, 16, processed);
-
-//            IvParameterSpec ivParameterSpec = new IvParameterSpec(mIv);
-//            SecretKeySpec secretKeySpec = new SecretKeySpec(mSKEYIDe, "AES");
-//
-//            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
-//            cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, ivParameterSpec);
-//
-//            cipher.update(payloadData);
-//
-//            byte[] outBuffer = cipher.doFinal();
-
-            print("IV", mIv);
-            print("Encrypted data", outBuffer);
-            print("payload before encrypt", payloadData);
-
-            System.arraycopy(outBuffer, outBuffer.length - 16, mIv, 0, 16);
-
-            return outBuffer;
-
-        } catch (Exception  e) {
+        } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
 
         return null;
     }
 
-    public byte[] decryptData(byte[] encryptedData) {
-        try{
-//            SecretKeySpec secretKeySpec = new SecretKeySpec(mSKEYIDe, "AES");
-//
-//            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-//            cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, new IvParameterSpec(mIv));
-//
-//            return cipher.doFinal(encryptedData);
+    public byte[] encryptData(byte[] payloadData) {
 
-            PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+        byte[] output = null;
+        print("IV", mIv);
 
-            cipher.init(false, new ParametersWithIV(new KeyParameter(mSKEYIDe), mIv));
-            byte[] outBuffer = new byte[cipher.getOutputSize(encryptedData.length)];
+        if (mEncryptAlgorithm.equals("AES256")) {
+            output = aes256Encrypt(payloadData);
 
-            int processed = cipher.processBytes(encryptedData, 0, encryptedData.length, outBuffer, 0);
-//            processed += cipher.doFinal(outBuffer, processed);
-
-            return outBuffer;
-
-        } catch(Exception e) {
-            e.printStackTrace();
+            print("Encrypted data", output);
+            print("payload before encrypt", payloadData);
         }
 
-        return null;
+        return output;
+    }
+
+    public byte[] decryptData(byte[] encryptedData) {
+        byte[] output = null;
+
+        if (mEncryptAlgorithm.equals("AES256")) {
+            output = aes256Decrypt(encryptedData);
+
+            print("data before decrypt", encryptedData);
+            print("data afger decrypt", output);
+        }
+
+        return output;
     }
 
     public void print(String label, byte[] data) {
@@ -522,5 +402,76 @@ public class KeyExchangeUtil {
         mNonce = new BigInteger(bytes);
     }
 
+    private byte[] hashDataWithKey(byte[] key, byte[] data) {
+        try {
+            Mac mac = Mac.getInstance(mHashAlgorithm);
+            SecretKeySpec secretKeySpec = new SecretKeySpec(key, mHashAlgorithm);
+            mac.init(secretKeySpec);
+
+            byte[] output = mac.doFinal(data);
+
+            mac.reset();
+
+            return output;
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    private byte[] aes256Encrypt(byte[] inputData) {
+
+        try {
+            PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+
+            cipher.init(true, new ParametersWithIV(new KeyParameter(mSKEYIDe), mIv));
+            byte[] outBuffer = new byte[cipher.getOutputSize(inputData.length)];
+
+            int processed = cipher.processBytes(inputData, 0, inputData.length, outBuffer, 0);
+            processed += cipher.doFinal(outBuffer, processed);
+
+            System.arraycopy(outBuffer, outBuffer.length - 16, mIv, 0, 16);
+
+            return outBuffer;
+
+        } catch (InvalidCipherTextException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    private byte[] aes256Decrypt(byte[] encryptedData) {
+        try{
+
+            PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+
+            cipher.init(false, new ParametersWithIV(new KeyParameter(mSKEYIDe), mIv));
+            byte[] outBuffer = new byte[cipher.getOutputSize(encryptedData.length)];
+
+            int processed = cipher.processBytes(encryptedData, 0, encryptedData.length, outBuffer, 0);
+//            processed += cipher.doFinal(outBuffer, processed);
+
+            return outBuffer;
+
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    private String getHashProvider() {
+        String provider = "SHA-256";
+
+        if (mHashAlgorithm.equals("HmacSHA1")) {
+            provider = "SHA-1";
+        } else if (mHashAlgorithm.equals("HmacSHA512")) {
+            provider = "SHA-512";
+        }
+
+        return provider;
+    }
 }
 

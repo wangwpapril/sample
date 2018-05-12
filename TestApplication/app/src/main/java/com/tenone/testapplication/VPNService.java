@@ -124,6 +124,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
             mKeyExchangeUtil = KeyExchangeUtil.getInstance();
             mKeyExchangeUtil.setPreSharedKey("test4stagwell");
+            mKeyExchangeUtil.setHashAlgorithm("HmacSHA256");
+            mKeyExchangeUtil.setmEncryptAlgorithm("AES256");
             //Intent pendingIntent = new Intent(this, AlertActivity.class);
             //configureIntent = PendingIntent.getActivity(this, REQUEST_CODE, pendingIntent, DEFAULT_INTENT_FLAG);
 
@@ -429,7 +431,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     System.arraycopy(idPayload, 0, combineData, 0, idPayload.length);
                     System.arraycopy(hashPayload, 0, combineData, idPayload.length, hashPayload.length);
 
-                    byte[] encryptedData = mKeyExchangeUtil.encryptData(combineData, keyData);
+                    byte[] encryptedData = mKeyExchangeUtil.prepare1stEncryptedPayload(combineData, keyData);
                     packet.put(prepareThirdMsg(isakmpHeader.toData(5, encryptedData.length + 28, flag[0]), encryptedData)).flip();
                     if (sendMessage(packet, tunnel)) {
                         while (readMessage(packet, tunnel)) {
