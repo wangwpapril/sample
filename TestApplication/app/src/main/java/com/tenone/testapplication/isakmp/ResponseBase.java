@@ -8,43 +8,23 @@ import java.util.List;
  * Created by willwang on 2018-05-03.
  */
 
-public class ResponseBase {
+abstract public class ResponseBase {
     public IsakmpHeader isakmpHeader;
     public List<PayloadBase> payloadList = new ArrayList<>();
-    public boolean encrypted;
 
     public ResponseBase(ByteBuffer buffer) {
         isakmpHeader = new IsakmpHeader(buffer);
-        if (isakmpHeader != null) {
-            int next = isakmpHeader.nextPayload;
-            encrypted = isakmpHeader.isEncrypted();
 
-            if (encrypted) {
-                byte[] encryptedData = new byte[isakmpHeader.payloadLength - 28];
-                buffer.get(encryptedData, 0, isakmpHeader.payloadLength - 28);
-                byte[] decryptedData = KeyExchangeUtil.getInstance().decryptData(encryptedData);
-                if (decryptedData != null) {
-                    buffer.clear();
-                    buffer.put(decryptedData);
-                    buffer.position(0);
-                }else {
-                    buffer.clear();
-                    next = 0;
-                }
-            }
-
-            while (next > 0) {
-                PayloadBase payload = parsePayload(next, buffer);
-                if (payload != null) {
-                    payloadList.add(payload);
-                    next = payload.nextPayload;
-                }else {
-                    break;
-                }
-            }
-
+        if (isDataValid()) {
+            parseData(buffer);
         }
     }
+
+    abstract boolean isDataValid();
+
+    abstract void parseData(ByteBuffer buffer);
+
+    abstract public boolean isValid();
 
     public IsakmpHeader getResHeader() {
         return isakmpHeader;
@@ -76,6 +56,9 @@ public class ResponseBase {
             case Constants.ISAKMP_NPTYPE_ID:
                 PayloadIdentification payloadIdentification = new PayloadIdentification(buffer);
                 return payloadIdentification;
+            case Constants.ISAKMP_NPTYPE_ATTR:
+                PayloadAttribute payloadAttribute = new PayloadAttribute(buffer);
+                return payloadAttribute;
             default:
                 return null;
         }

@@ -471,6 +471,31 @@ public class KeyExchangeUtil {
         return null;
     }
 
+    /**
+     * Generates the new IV base on the last IV and message id
+     * https://tools.ietf.org/id/draft-ietf-ipsec-ike-01.txt, section 4.2
+     *
+     * @param messageId
+     */
+    public void preparePhase2IV(byte[] messageId) {
+        if (mIv == null) {
+            return;
+        }
+
+        byte[] data = new byte[16 + messageId.length];
+        System.arraycopy(mIv, 0, data, 0, 16);
+        System.arraycopy(messageId, 0, data, 16, messageId.length);
+
+        try {
+            MessageDigest messageDigest = MessageDigest.getInstance(getHashProvider());
+            messageDigest.update(data);
+            byte[] ivBytes = messageDigest.digest();
+            System.arraycopy(ivBytes, 0, mIv, 0, 16);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+    }
+
     private String getHashProvider() {
         String provider = "SHA-256";
 
