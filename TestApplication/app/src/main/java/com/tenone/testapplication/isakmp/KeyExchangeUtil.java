@@ -375,8 +375,8 @@ public class KeyExchangeUtil {
         if (mEncryptAlgorithm.equals("AES256")) {
             output = aes256Decrypt(encryptedData);
 
-            print("data before decrypt", encryptedData);
-            print("data afger decrypt", output);
+//            print("data before decrypt", encryptedData);
+//            print("data afger decrypt", output);
         }
 
         return output;
@@ -445,6 +445,10 @@ public class KeyExchangeUtil {
     private byte[] aes256Decrypt(byte[] encryptedData) {
         try{
 
+            print("data before decrypt", encryptedData);
+            print("mIv before decrypt", mIv);
+
+
             PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
 
             cipher.init(false, new ParametersWithIV(new KeyParameter(mSKEYIDe), mIv));
@@ -452,6 +456,11 @@ public class KeyExchangeUtil {
 
             int processed = cipher.processBytes(encryptedData, 0, encryptedData.length, outBuffer, 0);
 //            processed += cipher.doFinal(outBuffer, processed);
+
+            System.arraycopy(encryptedData, encryptedData.length - 16, mIv, 0, 16);
+
+            print("data after decrypt", outBuffer);
+            print("mIv after decrypt", mIv);
 
             return outBuffer;
 

@@ -12,6 +12,7 @@ import android.widget.Toast;
 
 import com.tenone.testapplication.BuildConfig;
 import com.tenone.testapplication.R;
+import com.tenone.testapplication.isakmp.Constants;
 import com.tenone.testapplication.isakmp.IsakmpHeader;
 import com.tenone.testapplication.isakmp.KeyExchangeUtil;
 import com.tenone.testapplication.isakmp.PayloadBase;
@@ -445,6 +446,20 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
                     }
 
+                }
+
+                break;
+            case 4:
+                while (readMessage(packet, tunnel)) {
+                    packet.position(0);
+                    ResponseBase response = new ResponseBase(packet);
+                    if (response != null
+                            && response.getResHeader().isEncrypted()
+                            && response.getResHeader().exchangeType == Constants.EXCHANGE_TYPE_CONFIG_MODE) {
+                        responseBase = response;
+                        isakmpHeader = response.isakmpHeader;
+                        break;
+                    }
                 }
 
                 break;
