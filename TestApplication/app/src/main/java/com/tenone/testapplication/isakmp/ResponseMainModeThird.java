@@ -1,9 +1,12 @@
 package com.tenone.testapplication.isakmp;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 public class ResponseMainModeThird extends ResponseBase {
     private byte[] encryptedData;
+    private byte[] hashGenerated;
+    private boolean hashMatched = true;
 
     public ResponseMainModeThird(ByteBuffer buffer) {
         super(buffer);
@@ -36,6 +39,13 @@ public class ResponseMainModeThird extends ResponseBase {
             if (payload != null) {
                 payloadList.add(payload);
                 next = payload.nextPayload;
+                if (payload instanceof PayloadIdentification) {
+                    generateHash((PayloadIdentification)payload);
+                }
+
+                if (payload instanceof PayloadHash) {
+                    hashCompare((PayloadHash) payload);
+                }
             }else {
                 break;
             }
@@ -43,9 +53,29 @@ public class ResponseMainModeThird extends ResponseBase {
 
     }
 
+    private void generateHash(PayloadIdentification payload) {
+        byte[] idPayload = new byte[payload.payloadLength - 4];
+        System.arraycopy(Utils.toBytes(payload.type, 1), 0, idPayload, 0, 1);
+        System.arraycopy(payload.doiData, 0, idPayload, 1, 3);
+        System.arraycopy(payload.data, 0, idPayload, 4, payload.data.length);
+        hashGenerated = KeyExchangeUtil.getInstance().generateResponder1stHashData(
+                isakmpHeader.initiatorCookie,
+                isakmpHeader.responderCookie,
+                idPayload
+        );
+
+    }
+
+    private void hashCompare(PayloadHash payload) {
+        if (hashGenerated != null && payload.hashData != null
+                && hashGenerated.length == payload.hashData.length) {
+            hashMatched = Arrays.equals(hashGenerated, payload.hashData);
+        }
+    }
+
     @Override
     public boolean isValid() {
-        return isakmpHeader != null && payloadList.size() > 0;
+        return (isakmpHeader != null && payloadList.size() >= 2 && hashMatched);
     }
 
     public byte[] getNextIv() {

@@ -47,6 +47,11 @@ public class KeyExchangeUtil {
     private byte[] mSKEYIDa;
     private byte[] mSKEYIDe;
     private byte[] mIv;
+    private byte[] mServerPublicKeyData;
+    private byte[] mResponderNonce;
+    private byte[] mSAPayload;
+    private byte[] mResponderIDPayload;
+
     private String mHashAlgorithm;
     private String mEncryptAlgorithm;
 
@@ -329,29 +334,31 @@ public class KeyExchangeUtil {
         return hashData;
     }
 
-    public byte[] generateResponder1stHashData(byte[] initiatorPublicKey, byte[] responderPublicKey, byte[] initiatorCookie,
-                byte[] responderCookie, byte[] saPayload, byte[] responderIDPayload) {
+    public byte[] generateResponder1stHashData(byte[] initiatorCookie,
+                byte[] responderCookie, byte[] responderIDPayload) {
+        byte[] initiatorPublicKey = getPublicKey();
 
-        byte[] data = new byte[initiatorPublicKey.length + responderPublicKey.length +
-                initiatorCookie.length + responderCookie.length + saPayload.length - 4 + responderIDPayload.length - 4];
+        byte[] data = new byte[initiatorPublicKey.length + mServerPublicKeyData.length +
+                initiatorCookie.length + responderCookie.length + mSAPayload.length - 4 + responderIDPayload.length];
 
 
-        System.arraycopy(responderPublicKey, 0, data, 0, responderPublicKey.length);
-        System.arraycopy(initiatorPublicKey, 0, data, responderPublicKey.length, initiatorPublicKey.length);
+        System.arraycopy(mServerPublicKeyData, 0, data, 0, mServerPublicKeyData.length);
+        System.arraycopy(initiatorPublicKey, 0, data, mServerPublicKeyData.length, initiatorPublicKey.length);
 
         System.arraycopy(responderCookie, 0, data,
-                initiatorPublicKey.length + responderPublicKey.length, responderCookie.length);
+                initiatorPublicKey.length + mServerPublicKeyData.length, responderCookie.length);
         System.arraycopy(initiatorCookie, 0, data,
-                initiatorPublicKey.length + responderPublicKey.length + responderCookie.length, initiatorCookie.length);
-        System.arraycopy(saPayload, 4, data,
-                initiatorPublicKey.length + responderPublicKey.length + initiatorCookie.length + responderCookie.length,
-                saPayload.length - 4);
-        System.arraycopy(responderIDPayload, 4, data,
-                initiatorPublicKey.length + responderPublicKey.length + initiatorCookie.length + responderCookie.length + saPayload.length - 4,
-                responderIDPayload.length - 4);
+                initiatorPublicKey.length + mServerPublicKeyData.length + responderCookie.length, initiatorCookie.length);
+        System.arraycopy(mSAPayload, 4, data,
+                initiatorPublicKey.length + mServerPublicKeyData.length + initiatorCookie.length + responderCookie.length,
+                mSAPayload.length - 4);
+        System.arraycopy(responderIDPayload, 0, data,
+                initiatorPublicKey.length + mServerPublicKeyData.length + initiatorCookie.length + responderCookie.length + mSAPayload.length - 4,
+                responderIDPayload.length);
 
         byte[] hashData = hashDataWithKey(mSKEYID, data);
 
+        print("Responder's 1st responderIDPayload", responderIDPayload);
         print("Responder's 1st HashData", hashData);
 
         return hashData;
@@ -535,6 +542,38 @@ public class KeyExchangeUtil {
         }
 
         return provider;
+    }
+
+    public byte[] getServerPublicKeyData() {
+        return mServerPublicKeyData;
+    }
+
+    public void setServerPublicKeyData(byte[] mServerPublicKeyData) {
+        this.mServerPublicKeyData = mServerPublicKeyData;
+    }
+
+    public byte[] getResponderNonce() {
+        return mResponderNonce;
+    }
+
+    public void setResponderNonce(byte[] mResponderNonce) {
+        this.mResponderNonce = mResponderNonce;
+    }
+
+    public byte[] getSAPayload() {
+        return mSAPayload;
+    }
+
+    public void setSAPayload(byte[] mSAPayload) {
+        this.mSAPayload = mSAPayload;
+    }
+
+    public byte[] getResponderIDPayload() {
+        return mResponderIDPayload;
+    }
+
+    public void setResponderIDPayload(byte[] mResponderIDPayload) {
+        this.mResponderIDPayload = mResponderIDPayload;
     }
 }
 

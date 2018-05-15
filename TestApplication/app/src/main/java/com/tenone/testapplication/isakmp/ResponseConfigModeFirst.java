@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 
 public class ResponseConfigModeFirst extends ResponseBase {
     private boolean hasAttributes;
+    private byte[] encryptedData;
 
     public ResponseConfigModeFirst(ByteBuffer buffer) {
         super(buffer);
@@ -22,7 +23,7 @@ public class ResponseConfigModeFirst extends ResponseBase {
         if (next == Constants.ISAKMP_NPTYPE_HASH)
             KeyExchangeUtil.getInstance().preparePhase2IV(Utils.toBytes(isakmpHeader.messageId, 4));
 
-        byte[] encryptedData = new byte[isakmpHeader.payloadLength - 28];
+        encryptedData = new byte[isakmpHeader.payloadLength - 28];
         buffer.get(encryptedData, 0, isakmpHeader.payloadLength - 28);
         byte[] decryptedData = KeyExchangeUtil.getInstance().decryptData(encryptedData);
         if (decryptedData != null) {
@@ -52,5 +53,11 @@ public class ResponseConfigModeFirst extends ResponseBase {
     @Override
     public boolean isValid() {
         return isakmpHeader != null && payloadList.size() > 0 && hasAttributes;
+    }
+
+    public byte[] getNextIv() {
+        byte[] Iv = new byte[16];
+        System.arraycopy(encryptedData, encryptedData.length - 16, Iv, 0, 16);
+        return Iv;
     }
 }

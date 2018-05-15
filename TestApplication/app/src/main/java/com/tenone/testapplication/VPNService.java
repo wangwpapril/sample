@@ -402,10 +402,12 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                             for (PayloadBase base : responseBase.payloadList) {
                                 if (base instanceof PayloadKeyEx) {
                                     keyData = ((PayloadKeyEx) base).keyExData;
+                                    KeyExchangeUtil.getInstance().setServerPublicKeyData(keyData);
                                 }
 
                                 if (base instanceof PayloadNonce) {
                                     nonceData = ((PayloadNonce) base).nonceData;
+                                    KeyExchangeUtil.getInstance().setResponderNonce(nonceData);
                                 }
                             }
                         }
@@ -460,6 +462,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     if (response != null && response.isValid()) {
                         responseBase = response;
                         isakmpHeader = response.isakmpHeader;
+                        KeyExchangeUtil.getInstance().setIV(((ResponseConfigModeFirst)response).getNextIv());
+
                         break;
                     }
                 }
@@ -573,6 +577,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         byte[] header = prepareHeader(1);
 
         mSAPayload = prepareSAPayload();
+
+        KeyExchangeUtil.getInstance().setSAPayload(mSAPayload);
 
         int size = header.length + mSAPayload.length;
         byte[] payloadLength = Utils.toBytes(size);
