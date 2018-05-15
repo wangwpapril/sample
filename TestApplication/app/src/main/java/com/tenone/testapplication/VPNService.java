@@ -31,6 +31,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 
@@ -433,26 +435,20 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     byte[] encryptedData = mKeyExchangeUtil.prepare1stEncryptedPayload(combineData, keyData);
                     packet.put(prepareThirdMsg(isakmpHeader.toData(5, encryptedData.length + 28, flag[0]), encryptedData)).flip();
                     if (sendMessage(packet, tunnel)) {
-//                        List<ResponseBase> list = new ArrayList<>();
 
                         while (readMessage(packet, tunnel)) {
                             packet.position(0);
-                            ResponseBase response = new ResponseMainModeThird(packet);
+                            ResponseMainModeThird response = new ResponseMainModeThird(packet);
                             if (response != null && response.isValid()) {
+                                KeyExchangeUtil.getInstance().setIV(response.getNextIv());
                                 responseBase = response;
                                 break;
                             }
-//                            if (response != null)
-//                                list.add(response);
                         }
-//                        if (list.size() > 0) {
-//
-//                        }
 
                     }
 
                 }
-
                 break;
             case 4:
                 while (readMessage(packet, tunnel)) {
@@ -464,7 +460,6 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         break;
                     }
                 }
-
                 break;
             default:
                 break;

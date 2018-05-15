@@ -3,6 +3,7 @@ package com.tenone.testapplication.isakmp;
 import java.nio.ByteBuffer;
 
 public class ResponseMainModeThird extends ResponseBase {
+    private byte[] encryptedData;
 
     public ResponseMainModeThird(ByteBuffer buffer) {
         super(buffer);
@@ -18,18 +19,13 @@ public class ResponseMainModeThird extends ResponseBase {
     @Override
     void parseData(ByteBuffer buffer) {
 
-        byte[] encryptedData = new byte[isakmpHeader.payloadLength - 28];
+        encryptedData = new byte[isakmpHeader.payloadLength - 28];
         buffer.get(encryptedData, 0, isakmpHeader.payloadLength - 28);
         byte[] decryptedData = KeyExchangeUtil.getInstance().decryptData(encryptedData);
         if (decryptedData != null) {
             buffer.clear();
             buffer.put(decryptedData);
             buffer.position(0);
-
-            byte[] Iv = new byte[16];
-            System.arraycopy(decryptedData, decryptedData.length - 16, Iv, 0, 16);
-            KeyExchangeUtil.getInstance().setIV(Iv);
-
         }else {
             buffer.clear();
             next = 0;
@@ -50,6 +46,12 @@ public class ResponseMainModeThird extends ResponseBase {
     @Override
     public boolean isValid() {
         return isakmpHeader != null && payloadList.size() > 0;
+    }
+
+    public byte[] getNextIv() {
+        byte[] Iv = new byte[16];
+        System.arraycopy(encryptedData, encryptedData.length - 16, Iv, 0, 16);
+        return Iv;
     }
 
 }
