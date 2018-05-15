@@ -431,7 +431,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     mKeyExchangeUtil.generateExchangeInfo(nonceData, isakmpHeader.initiatorCookie, isakmpHeader.responderCookie);
 
                     byte[] idPayload = prepareIdentificationPayload();
-                    byte[] hashPayload = prepareHashPayload(idPayload);
+                    byte[] hashPayload = prepareHashPayloadForIDPayload(idPayload);
 
                     byte[] combineData = new byte[idPayload.length + hashPayload.length];
                     System.arraycopy(idPayload, 0, combineData, 0, idPayload.length);
@@ -464,6 +464,15 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         isakmpHeader = response.isakmpHeader;
                         KeyExchangeUtil.getInstance().setIV(((ResponseConfigModeFirst)response).getNextIv());
 
+                        packet.clear();
+                        packet.put(preparePhase2FirstMsg(isakmpHeader.toData(8), isakmpHeader.messageId)).flip();
+
+                        if (sendMessage(packet, tunnel)) {
+                            if (readMessage(packet, tunnel)) {
+                                packet.position(0);
+
+                            }
+                        }
                         break;
                     }
                 }
@@ -1151,7 +1160,56 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return payload;
     }
 
-    public byte[] prepareLoginConfigPayload() {
+    public byte[] preparePhase2FirstMsg(byte[] header, int messageId) {
+        byte[] loginConfigPayload = prepareLoginConfigPayload(Utils.toBytes(messageId));
+
+        byte[] msg = new byte[header.length + loginConfigPayload.length];
+        System.arraycopy(header, 0, msg, 0, header.length);
+        System.arraycopy(Utils.toBytes(header.length + loginConfigPayload.length), 0, msg, 24, 4);
+        System.arraycopy(loginConfigPayload, 0, msg, header.length, loginConfigPayload.length);
+
+        return msg;
+    }
+
+    public byte[] prepareLoginConfigPayload(byte[] messageId) {
+        byte[] nextPayload = Utils.toBytes(14, 1);
+        byte[] reserve = new byte[1];
+
+        byte[] loginAttributePayload = prepareLoginAttributePayload();
+        byte[][] payloads = new byte[1][];
+        payloads[0] = loginAttributePayload;
+        byte[] hashData = generateHashDataForAttributePayload(messageId, payloads);
+
+        byte[] payloadLength = Utils.toBytes(nextPayload.length + reserve.length + 2/* payloadLength */ + hashData.length, 2);
+        byte[] payloadBeforeEncrypt = new byte[nextPayload.length + reserve.length + 2/* payloadLength */ + hashData.length + loginAttributePayload.length];
+
+        System.arraycopy(nextPayload, 0, payloadBeforeEncrypt, 0, nextPayload.length);
+        System.arraycopy(reserve, 0, payloadBeforeEncrypt, nextPayload.length, reserve.length);
+        System.arraycopy(payloadLength, 0, payloadBeforeEncrypt, nextPayload.length + reserve.length, payloadLength.length);
+        System.arraycopy(hashData, 0, payloadBeforeEncrypt, nextPayload.length + reserve.length + payloadLength.length, hashData.length);
+        System.arraycopy(loginAttributePayload, 0, payloadBeforeEncrypt,
+                nextPayload.length + reserve.length + payloadLength.length + hashData.length, loginAttributePayload.length);
+
+        return mKeyExchangeUtil.encryptData(payloadBeforeEncrypt);
+    }
+
+    private byte[] generateHashDataForAttributePayload(byte[] messageId, byte[][] attributePayloads){
+        int length = messageId.length;
+        ByteBuffer byteBuffer = ByteBuffer.allocate(DEFAULT_PACKET_SIZE);
+        byteBuffer.put(messageId);
+
+        for (int i = 0; i < attributePayloads.length; i++) {
+            byteBuffer.put(attributePayloads[i]);
+            length += attributePayloads[i].length;
+        }
+
+        byte[] inputData = new byte[length];
+        System.arraycopy(byteBuffer.array(), 0, inputData, 0, length);
+
+        return mKeyExchangeUtil.hashConfigModePayload(inputData);
+    }
+
+    public byte[] prepareLoginAttributePayload() {
         byte[] nextPayload = new byte[1];
         byte[] reserve = new byte[1];
         //byte[] payloadLength = new byte[2];
@@ -1192,7 +1250,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
     private byte[] getTypeLengthValueAttribute(int type, byte[] attribute_data) {
         byte[] attribute_type = Utils.toBytes(type, 2);
         byte[] output = new byte[attribute_type.length + 2 /*length*/ + attribute_data.length];
-        byte[] attribute_length = Utils.toBytes(output.length, 2);
+        byte[] attribute_length = Utils.toBytes(attribute_data.length, 2);
         System.arraycopy(attribute_type, 0, output, 0, attribute_type.length);
         System.arraycopy(attribute_length, 0, output, attribute_type.length, attribute_length.length);
         System.arraycopy(attribute_data, 0, output, attribute_type.length + attribute_length.length, attribute_data.length);
@@ -1248,7 +1306,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return payload;
     }
 
-    private byte[] prepareHashPayload(byte[] idPayload) {
+    private byte[] prepareHashPayloadForIDPayload(byte[] idPayload) {
         byte[] nextPayload = Utils.toBytes(0, 1);
         byte[] reserved = new byte[1];
         //byte[] payloadLength = new byte[2];

@@ -389,6 +389,14 @@ public class KeyExchangeUtil {
         return null;
     }
 
+    public byte[] hashConfigModePayload(byte[] data) {
+        byte[] output = hashDataWithKey(mSKEYIDa, data);
+
+        print("Hash data for config mode payload", output);
+
+        return output;
+    }
+
     public byte[] encryptData(byte[] payloadData) {
 
         byte[] output = null;
@@ -527,7 +535,7 @@ public class KeyExchangeUtil {
             e.printStackTrace();
         }
     }
-    
+
     public void setIV(byte[] iv) {
         this.mIv = iv;
     }
