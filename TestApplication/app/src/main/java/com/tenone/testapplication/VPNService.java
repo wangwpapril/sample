@@ -17,6 +17,7 @@ import com.tenone.testapplication.isakmp.PayloadKeyEx;
 import com.tenone.testapplication.isakmp.PayloadNonce;
 import com.tenone.testapplication.isakmp.ResponseBase;
 import com.tenone.testapplication.isakmp.ResponseConfigModeFirst;
+import com.tenone.testapplication.isakmp.ResponseConfigModeSecond;
 import com.tenone.testapplication.isakmp.ResponseMainModeFirst;
 import com.tenone.testapplication.isakmp.ResponseMainModeSecond;
 import com.tenone.testapplication.isakmp.ResponseMainModeThird;
@@ -440,6 +441,9 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     byte[] encryptedData = mKeyExchangeUtil.prepare1stEncryptedPayload(combineData, keyData);
                     packet.put(prepareThirdMsg(isakmpHeader.toData(5, encryptedData.length + 28, flag[0]), encryptedData)).flip();
                     if (sendMessage(packet, tunnel)) {
+                        byte[] Iv = new byte[16];
+                        System.arraycopy(encryptedData, encryptedData.length - 16, Iv, 0, 16);
+                        KeyExchangeUtil.getInstance().setIV(Iv);
 
                         while (readMessage(packet, tunnel)) {
                             packet.position(0);
@@ -462,18 +466,27 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     if (response != null && response.isValid()) {
                         responseBase = response;
                         isakmpHeader = response.isakmpHeader;
-                        KeyExchangeUtil.getInstance().setIV(((ResponseConfigModeFirst)response).getNextIv());
+                        KeyExchangeUtil.getInstance().setIV(response.getNextIv());
 
                         packet.clear();
-                        packet.put(preparePhase2FirstMsg(isakmpHeader.toData(8), isakmpHeader.messageId)).flip();
+                        byte[] payload = preparePhase2FirstMsg(isakmpHeader.toData(8), isakmpHeader.messageId);
+                        packet.put(payload).flip();
 
                         if (sendMessage(packet, tunnel)) {
-                            if (readMessage(packet, tunnel)) {
-                                packet.position(0);
-
-                            }
+                            byte[] Iv = new byte[16];
+                            System.arraycopy(payload, payload.length - 16, Iv, 0, 16);
+                            KeyExchangeUtil.getInstance().setIV(Iv);
+                            break;
                         }
-                        break;
+                    }
+                }
+                break;
+            case 5:
+                while (readMessage(packet, tunnel)) {
+                    packet.position(0);
+                    ResponseBase response = new ResponseConfigModeSecond(packet);
+                    if (response != null && response.isValid()) {
+
                     }
                 }
                 break;

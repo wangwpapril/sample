@@ -471,7 +471,7 @@ public class KeyExchangeUtil {
             int processed = cipher.processBytes(inputData, 0, inputData.length, outBuffer, 0);
             processed += cipher.doFinal(outBuffer, processed);
 
-            System.arraycopy(outBuffer, outBuffer.length - 16, mIv, 0, 16);
+//            System.arraycopy(outBuffer, outBuffer.length - 16, mIv, 0, 16);
 
             return outBuffer;
 
@@ -539,6 +539,7 @@ public class KeyExchangeUtil {
     public void setIV(byte[] iv) {
         if (iv != null && iv.length == 16)
             this.mIv = iv;
+        print("SetIv=", iv);
     }
 
     private String getHashProvider() {
