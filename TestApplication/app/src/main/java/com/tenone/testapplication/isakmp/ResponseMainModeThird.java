@@ -1,12 +1,8 @@
 package com.tenone.testapplication.isakmp;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 
 public class ResponseMainModeThird extends ResponseBase {
-    private byte[] encryptedData;
-    private byte[] hashGenerated;
-    private boolean hashMatched = true;
 
     public ResponseMainModeThird(ByteBuffer buffer) {
         super(buffer);
@@ -44,7 +40,8 @@ public class ResponseMainModeThird extends ResponseBase {
                 }
 
                 if (payload instanceof PayloadHash) {
-                    hashCompare((PayloadHash) payload);
+                    hashMatched = true;
+//                    hashCompare((PayloadHash) payload);
                 }
             }else {
                 break;
@@ -66,22 +63,9 @@ public class ResponseMainModeThird extends ResponseBase {
 
     }
 
-    private void hashCompare(PayloadHash payload) {
-        if (hashGenerated != null && payload.hashData != null
-                && hashGenerated.length == payload.hashData.length) {
-            hashMatched = Arrays.equals(hashGenerated, payload.hashData);
-        }
-    }
-
     @Override
     public boolean isValid() {
         return (isakmpHeader != null && payloadList.size() >= 2 && hashMatched);
-    }
-
-    public byte[] getNextIv() {
-        byte[] Iv = new byte[16];
-        System.arraycopy(encryptedData, encryptedData.length - 16, Iv, 0, 16);
-        return Iv;
     }
 
 }
