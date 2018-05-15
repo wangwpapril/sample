@@ -398,8 +398,8 @@ public class NativeService extends Service {
                 intent, 0);
 
         // Set the info for the views that show in the notification panel.
-        notification.setLatestEventInfo(this, getText(R.string.app_name),
-                       text, contentIntent);
+//        notification.setLatestEventInfo(this, getText(R.string.app_name),
+//                       text, contentIntent);
 
         return notification;
 

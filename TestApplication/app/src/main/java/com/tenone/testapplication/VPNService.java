@@ -78,6 +78,9 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
     private static final int IKE_ATTRIBUTE_12 = 12; // life-duration
     private static final int IKE_ATTRIBUTE_14 = 14; // key-length
 
+    private final String mUserName = "testvpn";
+    private final String mPassword = "stagwell";
+
     private byte[] mInitiatorCookie = new byte[8];
     private byte[] mResponderCookie = new byte[8];
     private KeyExchangeUtil mKeyExchangeUtil;
@@ -126,7 +129,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             mKeyExchangeUtil = KeyExchangeUtil.getInstance();
             mKeyExchangeUtil.setPreSharedKey("test4stagwell");
             mKeyExchangeUtil.setHashAlgorithm("HmacSHA256");
-            mKeyExchangeUtil.setmEncryptAlgorithm("AES256");
+            mKeyExchangeUtil.setEncryptAlgorithm("AES256");
             //Intent pendingIntent = new Intent(this, AlertActivity.class);
             //configureIntent = PendingIntent.getActivity(this, REQUEST_CODE, pendingIntent, DEFAULT_INTENT_FLAG);
 
@@ -1144,7 +1147,54 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return payload;
     }
 
+    public byte[] prepareLoginConfigPayload() {
+        byte[] nextPayload = new byte[1];
+        byte[] reserve = new byte[1];
+        //byte[] payloadLength = new byte[2];
+        byte[] type = Utils.toBytes(2, 1);      // ISKAMP_CFG_REPLY
+        byte[] identifier = new byte[2];
 
+        try {
+            // XAUTH-USER-NAME. https://tools.ietf.org/html/draft-beaulieu-ike-xauth-02
+            byte[] attribute_username = getTypeLengthValueAttribute(16521, mUserName.getBytes("UTF-8"));
+            // // XAUTH-USER-PASSWORD
+            byte[] attribute_password = getTypeLengthValueAttribute(16522, mPassword.getBytes("UTF-8"));
+            int length = nextPayload.length + reserve.length * 2 + 2 /*payloadLength*/ +
+                    type.length + identifier.length + attribute_username.length + attribute_password.length;
+            byte[] payloadLength = Utils.toBytes(length, 2);
+
+            byte[] payload = new byte[length];
+            System.arraycopy(nextPayload, 0, payload, 0, nextPayload.length);
+            System.arraycopy(reserve, 0, payload, nextPayload.length, reserve.length);
+            System.arraycopy(payloadLength, 0, payload, nextPayload.length + reserve.length, payloadLength.length);
+            System.arraycopy(type, 0, payload, nextPayload.length + reserve.length + payloadLength.length, type.length);
+            System.arraycopy(reserve, 0, payload, nextPayload.length + reserve.length + payloadLength.length + type.length,
+                    reserve.length);
+            System.arraycopy(identifier, 0, payload, nextPayload.length + reserve.length + payloadLength.length + type.length +
+                    reserve.length, identifier.length);
+            System.arraycopy(attribute_username, 0, payload, nextPayload.length + reserve.length + payloadLength.length + type.length +
+                    reserve.length + identifier.length, attribute_username.length);
+            System.arraycopy(attribute_password, 0, payload, nextPayload.length + reserve.length + payloadLength.length + type.length +
+                    reserve.length + identifier.length + attribute_username.length, attribute_password.length);
+
+            return payload;
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    private byte[] getTypeLengthValueAttribute(int type, byte[] attribute_data) {
+        byte[] attribute_type = Utils.toBytes(type, 2);
+        byte[] output = new byte[attribute_type.length + 2 /*length*/ + attribute_data.length];
+        byte[] attribute_length = Utils.toBytes(output.length, 2);
+        System.arraycopy(attribute_type, 0, output, 0, attribute_type.length);
+        System.arraycopy(attribute_length, 0, output, attribute_type.length, attribute_length.length);
+        System.arraycopy(attribute_data, 0, output, attribute_type.length + attribute_length.length, attribute_data.length);
+
+        return output;
+    }
 
     private byte[] prepareKeyExchangeData() {
         mKeyExchangeUtil.generatePairKeys("test4stagwell");
