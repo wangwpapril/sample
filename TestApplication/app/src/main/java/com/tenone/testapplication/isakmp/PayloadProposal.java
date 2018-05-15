@@ -18,16 +18,18 @@ public class PayloadProposal extends PayloadBase{
     public PayloadProposal(ByteBuffer buffer) {
         super(buffer);
 
-        number = buffer.get();
-        protocolId = buffer.get();
-        spiSize = buffer.get();
-        transformNumber = buffer.get();
+        if (isValid()) {
+            number = buffer.get();
+            protocolId = buffer.get();
+            spiSize = buffer.get();
+            transformNumber = buffer.get();
 
-        if (transformNumber > 0) {
-            for (int i = 0; i < transformNumber; i++) {
-                PayloadTransform payloadTransform = new PayloadTransform(buffer);
-                if (payloadTransform != null)
-                    transformList.add(payloadTransform);
+            if (transformNumber > 0) {
+                for (int i = 0; i < transformNumber; i++) {
+                    PayloadTransform payloadTransform = new PayloadTransform(buffer);
+                    if (payloadTransform != null)
+                        transformList.add(payloadTransform);
+                }
             }
         }
     }

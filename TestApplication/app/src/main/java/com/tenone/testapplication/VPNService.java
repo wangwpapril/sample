@@ -10,15 +10,16 @@ import android.util.Log;
 import android.widget.Toast;
 
 
-import com.tenone.testapplication.BuildConfig;
-import com.tenone.testapplication.R;
-import com.tenone.testapplication.isakmp.Constants;
 import com.tenone.testapplication.isakmp.IsakmpHeader;
 import com.tenone.testapplication.isakmp.KeyExchangeUtil;
 import com.tenone.testapplication.isakmp.PayloadBase;
 import com.tenone.testapplication.isakmp.PayloadKeyEx;
 import com.tenone.testapplication.isakmp.PayloadNonce;
 import com.tenone.testapplication.isakmp.ResponseBase;
+import com.tenone.testapplication.isakmp.ResponseConfigModeFirst;
+import com.tenone.testapplication.isakmp.ResponseMainModeFirst;
+import com.tenone.testapplication.isakmp.ResponseMainModeSecond;
+import com.tenone.testapplication.isakmp.ResponseMainModeThird;
 import com.tenone.testapplication.isakmp.Utils;
 
 import java.io.FileInputStream;
@@ -30,10 +31,9 @@ import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
-
-import javax.crypto.Cipher;
-import javax.crypto.SecretKeyFactory;
 
 
 public class VPNService extends VpnService implements Handler.Callback, Runnable{
@@ -384,8 +384,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 if(sendMessage(packet, tunnel)) {
                     if (readMessage(packet, tunnel)) {
                         packet.position(0);
-                        responseBase = new ResponseBase(packet);
-                        if (responseBase != null) {
+                        responseBase = new ResponseMainModeFirst(packet);
+                        if (responseBase != null && responseBase.isValid()) {
                             isakmpHeader = responseBase.isakmpHeader;
                         }
                     }
@@ -397,8 +397,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 if(sendMessage(packet, tunnel)) {
                     if (readMessage(packet, tunnel)) {
                         packet.position(0);
-                        responseBase = new ResponseBase(packet);
-                        if (responseBase != null) {
+                        responseBase = new ResponseMainModeSecond(packet);
+                        if (responseBase != null && responseBase.isValid()) {
                             for (PayloadBase base : responseBase.payloadList) {
                                 if (base instanceof PayloadKeyEx) {
                                     keyData = ((PayloadKeyEx) base).keyExData;
@@ -438,10 +438,12 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     byte[] encryptedData = mKeyExchangeUtil.prepare1stEncryptedPayload(combineData, keyData);
                     packet.put(prepareThirdMsg(isakmpHeader.toData(5, encryptedData.length + 28, flag[0]), encryptedData)).flip();
                     if (sendMessage(packet, tunnel)) {
+
                         while (readMessage(packet, tunnel)) {
                             packet.position(0);
-                            ResponseBase response = new ResponseBase(packet);
-                            if (response != null && response.getResHeader().isEncrypted()) {
+                            ResponseMainModeThird response = new ResponseMainModeThird(packet);
+                            if (response != null && response.isValid()) {
+                                KeyExchangeUtil.getInstance().setIV(response.getNextIv());
                                 responseBase = response;
                                 break;
                             }
@@ -450,21 +452,17 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     }
 
                 }
-
                 break;
             case 4:
                 while (readMessage(packet, tunnel)) {
                     packet.position(0);
-                    ResponseBase response = new ResponseBase(packet);
-                    if (response != null
-                            && response.getResHeader().isEncrypted()
-                            && response.getResHeader().exchangeType == Constants.EXCHANGE_TYPE_CONFIG_MODE) {
+                    ResponseBase response = new ResponseConfigModeFirst(packet);
+                    if (response != null && response.isValid()) {
                         responseBase = response;
                         isakmpHeader = response.isakmpHeader;
                         break;
                     }
                 }
-
                 break;
             default:
                 break;

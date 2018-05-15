@@ -13,9 +13,11 @@ public class PayloadSA extends PayloadBase{
 
     public PayloadSA(ByteBuffer buffer) {
         super(buffer);
-        doi = buffer.getInt();
-        situation = buffer.getInt();
+        if (isValid()) {
+            doi = buffer.getInt();
+            situation = buffer.getInt();
 
-        payloadProposal = new PayloadProposal(buffer);
+            payloadProposal = new PayloadProposal(buffer);
+        }
     }
 }

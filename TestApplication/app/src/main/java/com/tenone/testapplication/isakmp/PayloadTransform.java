@@ -17,28 +17,25 @@ public class PayloadTransform extends PayloadBase{
     public PayloadTransform(ByteBuffer buffer) {
         super(buffer);
 
-        number = buffer.get();
-        id = buffer.get();
-        buffer.get(reserved2, 0, 2);
+        if (isValid()) {
+            number = buffer.get();
+            id = buffer.get();
+            buffer.get(reserved2, 0, 2);
 
-        if (this.payloadLength - 8 > 0) {
-            int attSize = this.payloadLength - 8;
-            while (attSize > 0) {
-                DataAttribute dataAttribute = new DataAttribute(buffer);
-                if (dataAttribute != null) {
-                    attributeList.add(dataAttribute);
-                    attSize -= dataAttribute.totalLength;
-                }else {
-                    break;
+            if (this.payloadLength - 8 > 0) {
+                int attSize = this.payloadLength - 8;
+                while (attSize > 0) {
+                    DataAttribute dataAttribute = new DataAttribute(buffer);
+                    if (dataAttribute != null) {
+                        attributeList.add(dataAttribute);
+                        attSize -= dataAttribute.totalLength;
+                    } else {
+                        break;
+                    }
                 }
             }
-        }
-
-        if (attributeList.isEmpty()) {
 
         }
     }
-
-
 
 }

@@ -402,9 +402,6 @@ public class KeyExchangeUtil {
 
         if (mEncryptAlgorithm.equals("AES256")) {
             output = aes256Decrypt(encryptedData);
-
-//            print("data before decrypt", encryptedData);
-//            print("data afger decrypt", output);
         }
 
         return output;
@@ -485,10 +482,10 @@ public class KeyExchangeUtil {
             int processed = cipher.processBytes(encryptedData, 0, encryptedData.length, outBuffer, 0);
 //            processed += cipher.doFinal(outBuffer, processed);
 
-            System.arraycopy(encryptedData, encryptedData.length - 16, mIv, 0, 16);
+//            System.arraycopy(encryptedData, encryptedData.length - 16, mIv, 0, 16);
 
             print("data after decrypt", outBuffer);
-            print("mIv after decrypt", mIv);
+//            print("mIv after decrypt", mIv);
 
             return outBuffer;
 
@@ -522,6 +519,10 @@ public class KeyExchangeUtil {
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
+    }
+    
+    public void setIV(byte[] iv) {
+        this.mIv = iv;
     }
 
     private String getHashProvider() {

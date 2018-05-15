@@ -11,7 +11,7 @@ public class PayloadNonce extends PayloadBase {
 
     public PayloadNonce(ByteBuffer buffer) {
         super(buffer);
-        if (payloadLength - 4 > 0) {
+        if (isValid()) {
             nonceData = new byte[payloadLength - 4];
             buffer.get(nonceData, 0, payloadLength - 4);
         }

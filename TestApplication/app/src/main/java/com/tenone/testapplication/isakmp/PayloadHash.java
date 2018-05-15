@@ -11,7 +11,7 @@ public class PayloadHash extends PayloadBase {
 
     public PayloadHash(ByteBuffer buffer) {
         super(buffer);
-        if (payloadLength - 4 > 0 && payloadLength <= buffer.remaining()) {
+        if (isValid()) {
             hashData = new byte[payloadLength - 4];
             buffer.get(hashData, 0, payloadLength - 4);
         }

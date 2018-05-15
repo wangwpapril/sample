@@ -22,7 +22,7 @@ public class DataAttribute {
             attLength = 2;
             totalLength = 4;
         }else {
-            attLength = buffer.getInt();
+            attLength = buffer.getShort();
             totalLength = 4 + attLength;
         }
         value = new byte[attLength];

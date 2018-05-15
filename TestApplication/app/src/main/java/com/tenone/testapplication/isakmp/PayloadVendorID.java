@@ -11,7 +11,9 @@ public class PayloadVendorID extends PayloadBase {
 
     public PayloadVendorID(ByteBuffer buffer) {
         super(buffer);
-        vendorId = new byte[payloadLength - 4];
-        buffer.get(vendorId, 0, payloadLength - 4);
+        if (isValid()) {
+            vendorId = new byte[payloadLength - 4];
+            buffer.get(vendorId, 0, payloadLength - 4);
+        }
     }
 }
