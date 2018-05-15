@@ -537,7 +537,8 @@ public class KeyExchangeUtil {
     }
 
     public void setIV(byte[] iv) {
-        this.mIv = iv;
+        if (iv != null && iv.length == 16)
+            this.mIv = iv;
     }
 
     private String getHashProvider() {

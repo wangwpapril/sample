@@ -2,6 +2,7 @@ package com.tenone.testapplication.isakmp;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -12,6 +13,10 @@ abstract public class ResponseBase {
     public IsakmpHeader isakmpHeader;
     public List<PayloadBase> payloadList = new ArrayList<>();
     protected int next;
+    protected byte[] encryptedData;
+    protected byte[] hashGenerated;
+    protected boolean hashMatched;
+
 
     public ResponseBase(ByteBuffer buffer) {
         isakmpHeader = new IsakmpHeader(buffer);
@@ -65,6 +70,23 @@ abstract public class ResponseBase {
                 return null;
         }
 
+    }
+
+    public byte[] getNextIv() {
+        if (encryptedData != null && encryptedData.length > 16) {
+            byte[] Iv = new byte[16];
+            System.arraycopy(encryptedData, encryptedData.length - 16, Iv, 0, 16);
+            return Iv;
+        }else {
+            return null;
+        }
+    }
+
+    protected void hashCompare(PayloadHash payload) {
+        if (hashGenerated != null && payload.hashData != null
+                && hashGenerated.length == payload.hashData.length) {
+            hashMatched = Arrays.equals(hashGenerated, payload.hashData);
+        }
     }
 
 }

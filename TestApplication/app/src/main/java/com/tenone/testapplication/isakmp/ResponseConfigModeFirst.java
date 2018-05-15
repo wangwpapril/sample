@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 
 public class ResponseConfigModeFirst extends ResponseBase {
     private boolean hasAttributes;
-    private byte[] encryptedData;
 
     public ResponseConfigModeFirst(ByteBuffer buffer) {
         super(buffer);
@@ -53,11 +52,5 @@ public class ResponseConfigModeFirst extends ResponseBase {
     @Override
     public boolean isValid() {
         return isakmpHeader != null && payloadList.size() > 0 && hasAttributes;
-    }
-
-    public byte[] getNextIv() {
-        byte[] Iv = new byte[16];
-        System.arraycopy(encryptedData, encryptedData.length - 16, Iv, 0, 16);
-        return Iv;
     }
 }
