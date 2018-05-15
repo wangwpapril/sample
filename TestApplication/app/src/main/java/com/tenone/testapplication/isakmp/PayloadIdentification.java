@@ -14,11 +14,12 @@ public class PayloadIdentification extends PayloadBase {
     public PayloadIdentification(ByteBuffer buffer) {
         super(buffer);
 
-        type = buffer.get();
-        buffer.get(doiData, 0, 3);
+        if (isValid()) {
+            type = buffer.get();
+            buffer.get(doiData, 0, 3);
 
-        data = new byte[payloadLength - 8];
-        buffer.get(data, 0, payloadLength - 8);
-
+            data = new byte[payloadLength - 8];
+            buffer.get(data, 0, payloadLength - 8);
+        }
     }
 }

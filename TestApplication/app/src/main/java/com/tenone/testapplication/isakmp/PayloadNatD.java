@@ -11,7 +11,7 @@ public class PayloadNatD extends PayloadBase {
 
     public PayloadNatD(ByteBuffer buffer) {
         super(buffer);
-        if (payloadLength - 4 > 0 && payloadLength <= buffer.remaining()) {
+        if (isValid()) {
             natData = new byte[payloadLength - 4];
             buffer.get(natData, 0, payloadLength - 4);
         }

@@ -10,10 +10,12 @@ public class PayloadAttribute extends PayloadBase {
     public PayloadAttribute(ByteBuffer buffer) {
         super(buffer);
 
-        type = buffer.get();
-        buffer.get();
-        identifier = buffer.getShort();
-        attributes = new byte[payloadLength - 8];
-        buffer.get(attributes, 0, payloadLength - 8);
+        if (isValid()) {
+            type = buffer.get();
+            buffer.get();
+            identifier = buffer.getShort();
+            attributes = new byte[payloadLength - 8];
+            buffer.get(attributes, 0, payloadLength - 8);
+        }
     }
 }

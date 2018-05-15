@@ -11,9 +11,11 @@ import java.util.List;
 abstract public class ResponseBase {
     public IsakmpHeader isakmpHeader;
     public List<PayloadBase> payloadList = new ArrayList<>();
+    protected int next;
 
     public ResponseBase(ByteBuffer buffer) {
         isakmpHeader = new IsakmpHeader(buffer);
+        next = isakmpHeader.nextPayload;
 
         if (isDataValid()) {
             parseData(buffer);

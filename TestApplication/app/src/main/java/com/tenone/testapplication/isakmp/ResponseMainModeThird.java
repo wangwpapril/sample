@@ -17,7 +17,6 @@ public class ResponseMainModeThird extends ResponseBase {
 
     @Override
     void parseData(ByteBuffer buffer) {
-        int next = isakmpHeader.nextPayload;
 
         byte[] encryptedData = new byte[isakmpHeader.payloadLength - 28];
         buffer.get(encryptedData, 0, isakmpHeader.payloadLength - 28);
@@ -26,6 +25,11 @@ public class ResponseMainModeThird extends ResponseBase {
             buffer.clear();
             buffer.put(decryptedData);
             buffer.position(0);
+
+            byte[] Iv = new byte[16];
+            System.arraycopy(decryptedData, decryptedData.length - 16, Iv, 0, 16);
+            KeyExchangeUtil.getInstance().setIV(Iv);
+
         }else {
             buffer.clear();
             next = 0;

@@ -11,7 +11,7 @@ public class PayloadKeyEx extends PayloadBase {
 
     public PayloadKeyEx(ByteBuffer buffer) {
         super(buffer);
-        if (payloadLength - 4 > 0) {
+        if (isValid()) {
             keyExData = new byte[payloadLength - 4];
             buffer.get(keyExData, 0, payloadLength - 4);
         }

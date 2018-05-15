@@ -3,6 +3,7 @@ package com.tenone.testapplication.isakmp;
 import java.nio.ByteBuffer;
 
 public class ResponseConfigModeFirst extends ResponseBase {
+    private boolean hasAttributes;
 
     public ResponseConfigModeFirst(ByteBuffer buffer) {
         super(buffer);
@@ -17,7 +18,6 @@ public class ResponseConfigModeFirst extends ResponseBase {
 
     @Override
     void parseData(ByteBuffer buffer) {
-        int next = isakmpHeader.nextPayload;
 
         if (next == Constants.ISAKMP_NPTYPE_HASH)
             KeyExchangeUtil.getInstance().preparePhase2IV(Utils.toBytes(isakmpHeader.messageId, 4));
@@ -39,6 +39,9 @@ public class ResponseConfigModeFirst extends ResponseBase {
             if (payload != null) {
                 payloadList.add(payload);
                 next = payload.nextPayload;
+                if (payload instanceof PayloadAttribute) {
+                    hasAttributes = true;
+                }
             }else {
                 break;
             }
@@ -48,6 +51,6 @@ public class ResponseConfigModeFirst extends ResponseBase {
 
     @Override
     public boolean isValid() {
-        return isakmpHeader != null && payloadList.size() > 0;
+        return isakmpHeader != null && payloadList.size() > 0 && hasAttributes;
     }
 }

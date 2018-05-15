@@ -18,7 +18,6 @@ public class ResponseMainModeSecond extends ResponseBase {
 
     @Override
     void parseData(ByteBuffer buffer) {
-        int next = isakmpHeader.nextPayload;
         while (next > 0) {
             PayloadBase payload = parsePayload(next, buffer);
             if (payload != null) {
