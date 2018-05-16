@@ -74,6 +74,21 @@ public class IsakmpHeader {
         return headerData;
     }
 
+    public byte[] toData(int nextPayloadType, int messageId) {
+        this.nextPayloadType = nextPayloadType;
+        this.messageId = messageId;
+        if (!ready) {
+            prepareHeader();
+        }else {
+            byte[] nextPayload = toBytes(nextPayloadType, 1);    // Security Association
+            System.arraycopy(nextPayload, 0, headerData, 16, 1);
+            System.arraycopy(toBytes(messageId, 4), 0, headerData, 20, 4);
+        }
+
+        return headerData;
+
+    }
+
     public byte[] toData(int nextPayloadType, int length, byte flag) {
         this.nextPayloadType = nextPayloadType;
         this.flags = flag;
@@ -99,6 +114,29 @@ public class IsakmpHeader {
         version |= 1 << 4;       // Major version: 1 (first 4 bits), Minor version: 0 (last 4 bits)
         exchangeType = toBytes(2, 1)[0];  // 2 - Identity Protection (Main mode)
         byte[] messageId = new byte[4];
+        byte[] payloadLength = new byte[4];
+
+        System.arraycopy(initiatorCookie, 0, headerData, 0, 8);
+        System.arraycopy(responderCookie, 0, headerData, 8, 8);
+        System.arraycopy(nextPayload, 0, headerData, 16, 1);
+        System.arraycopy(new byte[]{version}, 0, headerData, 17, 1);
+        System.arraycopy(new byte[]{exchangeType}, 0, headerData, 18, 1);
+        System.arraycopy(new byte[]{flags}, 0, headerData, 19, 1);
+        System.arraycopy(messageId, 0, headerData, 20, 4);
+        System.arraycopy(payloadLength, 0, headerData, 24, 4);
+
+    }
+
+    private void prepareHeader(int msgId) {
+
+        initiatorCookie = generateInitiatorCookie();
+        responderCookie = new byte[COOKIE_LENGTH];
+        byte[] nextPayload = toBytes(nextPayloadType, 1);    // Security Association
+
+//        nextPayload = toBytes(1, 1)[0];    // Security Association
+        version |= 1 << 4;       // Major version: 1 (first 4 bits), Minor version: 0 (last 4 bits)
+        exchangeType = toBytes(2, 1)[0];  // 2 - Identity Protection (Main mode)
+        byte[] messageId = toBytes(msgId, 4);
         byte[] payloadLength = new byte[4];
 
         System.arraycopy(initiatorCookie, 0, headerData, 0, 8);
