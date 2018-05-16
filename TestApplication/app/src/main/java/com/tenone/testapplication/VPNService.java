@@ -484,6 +484,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     if (response != null && response.isValid()) {
                         responseBase = response;
                         isakmpHeader = response.isakmpHeader;
+                        KeyExchangeUtil.getInstance().setIV(response.getNextIv());
 
                         break;
                     }
