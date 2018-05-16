@@ -486,6 +486,13 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         isakmpHeader = response.isakmpHeader;
                         KeyExchangeUtil.getInstance().setIV(response.getNextIv());
 
+                        packet.clear();
+                        byte[] secondMsg = preparePhase2SecondMsg(isakmpHeader.toData(8), isakmpHeader.messageId);
+                        packet.put(secondMsg).flip();
+                        if (sendMessage(packet, tunnel)) {
+
+                        }
+
                         break;
                     }
                 }
@@ -1184,6 +1191,17 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return msg;
     }
 
+    public byte[] preparePhase2SecondMsg(byte[] header, int messageId) {
+        byte[] ackConfigPayload = prepareAcknowledgeConfigPayload(Utils.toBytes(messageId));
+
+        byte[] msg = new byte[header.length + ackConfigPayload.length];
+        System.arraycopy(header, 0, msg, 0, header.length);
+        System.arraycopy(Utils.toBytes(header.length + ackConfigPayload.length), 0, msg, 24, 4);
+        System.arraycopy(ackConfigPayload, 0, msg, header.length, ackConfigPayload.length);
+
+        return msg;
+    }
+
     public byte[] prepareLoginConfigPayload(byte[] messageId) {
         byte[] nextPayload = Utils.toBytes(14, 1);
         byte[] reserve = new byte[1];
@@ -1204,6 +1222,59 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 nextPayload.length + reserve.length + payloadLength.length + hashData.length, loginAttributePayload.length);
 
         return mKeyExchangeUtil.encryptData(payloadBeforeEncrypt);
+    }
+
+    private byte[] prepareAcknowledgeConfigPayload(byte[] messageId) {
+        byte[] nextPayload = Utils.toBytes(14, 1);
+        byte[] reserve = new byte[1];
+
+        byte[] ackAttributePayload = prepareAckAttributePayload();
+        byte[][] payloads = new byte[1][];
+        payloads[0] = ackAttributePayload;
+        byte[] hashData = generateHashDataForAttributePayload(messageId, payloads);
+
+        byte[] payloadLength = Utils.toBytes(nextPayload.length + reserve.length + 2/* payloadLength */ + hashData.length, 2);
+        byte[] payloadBeforeEncrypt = new byte[nextPayload.length + reserve.length + 2/* payloadLength */ + hashData.length + ackAttributePayload.length];
+
+        System.arraycopy(nextPayload, 0, payloadBeforeEncrypt, 0, nextPayload.length);
+        System.arraycopy(reserve, 0, payloadBeforeEncrypt, nextPayload.length, reserve.length);
+        System.arraycopy(payloadLength, 0, payloadBeforeEncrypt, nextPayload.length + reserve.length, payloadLength.length);
+        System.arraycopy(hashData, 0, payloadBeforeEncrypt, nextPayload.length + reserve.length + payloadLength.length, hashData.length);
+        System.arraycopy(ackAttributePayload, 0, payloadBeforeEncrypt,
+                nextPayload.length + reserve.length + payloadLength.length + hashData.length, ackAttributePayload.length);
+
+        return mKeyExchangeUtil.encryptData(payloadBeforeEncrypt);
+    }
+
+    private byte[] prepareAckAttributePayload() {
+        byte[] nextPayload = new byte[1];
+        byte[] reserve = new byte[1];
+        //byte[] payloadLength = new byte[2];
+        byte[] type = Utils.toBytes(4, 1);      // ISAKMP-CFG-ACK
+        byte[] identifier = new byte[2];
+
+        // 49295 (0xc08f)
+        byte[] attribute = Utils.toBytes(49295, 2);
+        byte[] attribute_value = new byte[2];
+        int length = nextPayload.length + reserve.length * 2 + 2 /*payloadLength*/ +
+                type.length + identifier.length + attribute.length + attribute_value.length;
+        byte[] payloadLength = Utils.toBytes(length, 2);
+
+        byte[] payload = new byte[length];
+        System.arraycopy(nextPayload, 0, payload, 0, nextPayload.length);
+        System.arraycopy(reserve, 0, payload, nextPayload.length, reserve.length);
+        System.arraycopy(payloadLength, 0, payload, nextPayload.length + reserve.length, payloadLength.length);
+        System.arraycopy(type, 0, payload, nextPayload.length + reserve.length + payloadLength.length, type.length);
+        System.arraycopy(reserve, 0, payload, nextPayload.length + reserve.length + payloadLength.length + type.length,
+                reserve.length);
+        System.arraycopy(identifier, 0, payload, nextPayload.length + reserve.length + payloadLength.length + type.length +
+                reserve.length, identifier.length);
+        System.arraycopy(attribute, 0, payload, nextPayload.length + reserve.length + payloadLength.length + type.length +
+                reserve.length + identifier.length, attribute.length);
+        System.arraycopy(attribute_value, 0, payload, nextPayload.length + reserve.length + payloadLength.length + type.length +
+                reserve.length + identifier.length + attribute.length, attribute_value.length);
+
+        return payload;
     }
 
     private byte[] generateHashDataForAttributePayload(byte[] messageId, byte[][] attributePayloads){
