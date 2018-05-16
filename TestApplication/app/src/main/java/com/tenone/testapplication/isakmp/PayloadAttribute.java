@@ -19,8 +19,8 @@ public class PayloadAttribute extends PayloadBase {
             identifier = buffer.getShort();
 
             if (this.payloadLength - 8 > 0) {
-                attributes = new byte[payloadLength - 8];
-                buffer.get(attributes, 0, payloadLength - 8);
+//                attributes = new byte[payloadLength - 8];
+//                buffer.get(attributes, 0, payloadLength - 8);
                 int attSize = this.payloadLength - 8;
                 while (attSize > 0) {
                     DataAttribute dataAttribute = new DataAttribute(buffer);

@@ -482,6 +482,9 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     packet.position(0);
                     ResponseBase response = new ResponseConfigModeSecond(packet);
                     if (response != null && response.isValid()) {
+                        responseBase = response;
+                        isakmpHeader = response.isakmpHeader;
+
                         break;
                     }
                 }
