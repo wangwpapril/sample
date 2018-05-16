@@ -449,14 +449,13 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                             packet.position(0);
                             ResponseMainModeThird response = new ResponseMainModeThird(packet);
                             if (response != null && response.isValid()) {
-                                KeyExchangeUtil.getInstance().setIV(response.getNextIv());
                                 responseBase = response;
+                                KeyExchangeUtil.getInstance().setFirstPhaseIv(response.getNextIv());
                                 break;
                             }
                         }
 
                     }
-
                 }
                 break;
             case 4:
@@ -473,9 +472,6 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         packet.put(payload).flip();
 
                         if (sendMessage(packet, tunnel)) {
-                            byte[] Iv = new byte[16];
-                            System.arraycopy(payload, payload.length - 16, Iv, 0, 16);
-                            KeyExchangeUtil.getInstance().setIV(Iv);
                             break;
                         }
                     }
@@ -486,7 +482,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     packet.position(0);
                     ResponseBase response = new ResponseConfigModeSecond(packet);
                     if (response != null && response.isValid()) {
-
+                        break;
                     }
                 }
                 break;

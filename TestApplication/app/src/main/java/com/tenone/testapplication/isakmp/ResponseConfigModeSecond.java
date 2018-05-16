@@ -18,8 +18,8 @@ public class ResponseConfigModeSecond extends ResponseBase {
 
     @Override
     void parseData(ByteBuffer buffer) {
-//        if (next == Constants.ISAKMP_NPTYPE_HASH)
-//            KeyExchangeUtil.getInstance().preparePhase2IV(Utils.toBytes(isakmpHeader.messageId, 4));
+        if (next == Constants.ISAKMP_NPTYPE_HASH)
+            KeyExchangeUtil.getInstance().preparePhase2IV(Utils.toBytes(isakmpHeader.messageId, 4));
 
         encryptedData = new byte[isakmpHeader.payloadLength - 28];
         buffer.get(encryptedData, 0, isakmpHeader.payloadLength - 28);

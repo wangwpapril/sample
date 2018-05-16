@@ -6,6 +6,7 @@ import org.spongycastle.crypto.InvalidCipherTextException;
 import org.spongycastle.crypto.engines.AESEngine;
 import org.spongycastle.crypto.modes.CBCBlockCipher;
 import org.spongycastle.crypto.paddings.PaddedBufferedBlockCipher;
+import org.spongycastle.crypto.paddings.ZeroBytePadding;
 import org.spongycastle.crypto.params.KeyParameter;
 import org.spongycastle.crypto.params.ParametersWithIV;
 
@@ -47,6 +48,7 @@ public class KeyExchangeUtil {
     private byte[] mSKEYIDa;
     private byte[] mSKEYIDe;
     private byte[] mIv;
+    private byte[] mFirstPhaseIv;
     private byte[] mServerPublicKeyData;
     private byte[] mResponderNonce;
     private byte[] mSAPayload;
@@ -489,13 +491,13 @@ public class KeyExchangeUtil {
             print("mIv before decrypt", mIv);
 
 
-            PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+            PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()), new ZeroBytePadding());
 
             cipher.init(false, new ParametersWithIV(new KeyParameter(mSKEYIDe), mIv));
             byte[] outBuffer = new byte[cipher.getOutputSize(encryptedData.length)];
 
             int processed = cipher.processBytes(encryptedData, 0, encryptedData.length, outBuffer, 0);
-//            processed += cipher.doFinal(outBuffer, processed);
+            processed += cipher.doFinal(outBuffer, processed);
 
 //            System.arraycopy(encryptedData, encryptedData.length - 16, mIv, 0, 16);
 
@@ -518,12 +520,12 @@ public class KeyExchangeUtil {
      * @param messageId
      */
     public void preparePhase2IV(byte[] messageId) {
-        if (mIv == null) {
+        if (mFirstPhaseIv == null || mIv == null) {
             return;
         }
 
         byte[] data = new byte[16 + messageId.length];
-        System.arraycopy(mIv, 0, data, 0, 16);
+        System.arraycopy(mFirstPhaseIv, 0, data, 0, 16);
         System.arraycopy(messageId, 0, data, 16, messageId.length);
 
         try {
@@ -584,6 +586,14 @@ public class KeyExchangeUtil {
 
     public void setResponderIDPayload(byte[] mResponderIDPayload) {
         this.mResponderIDPayload = mResponderIDPayload;
+    }
+
+    public byte[] getFirstPhaseIv() {
+        return mFirstPhaseIv;
+    }
+
+    public void setFirstPhaseIv(byte[] mFirstPhaseIv) {
+        this.mFirstPhaseIv = mFirstPhaseIv;
     }
 }
 
