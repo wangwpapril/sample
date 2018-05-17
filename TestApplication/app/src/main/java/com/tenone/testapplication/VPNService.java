@@ -502,8 +502,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                             byte[] thirdMsg = preparePhase2ThirdMsg(isakmpHeader.toData(8, messageId), messageId);
                             packet.put(thirdMsg).flip();
                             if (sendMessage(packet, tunnel)) {
-//                                System.arraycopy(secondMsg, thirdMsg.length - 16, Iv, 0, 16);
-//                                KeyExchangeUtil.getInstance().setIV(Iv);
+                                System.arraycopy(thirdMsg, thirdMsg.length - 16, Iv, 0, 16);
+                                KeyExchangeUtil.getInstance().setIV(Iv);
                                 break;
                             }
                         }
@@ -517,8 +517,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     packet.position(0);
                     ResponseBase response = new ResponseConfigModeThird(packet);
                     if (response != null && response.isValid()) {
-//                        responseBase = response;
-//                        isakmpHeader = response.isakmpHeader;
+                        responseBase = response;
+                        isakmpHeader = response.isakmpHeader;
 //                        KeyExchangeUtil.getInstance().setIV(response.getNextIv());
 //
 //                        packet.clear();
