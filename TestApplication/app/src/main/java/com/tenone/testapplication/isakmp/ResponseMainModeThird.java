@@ -40,8 +40,8 @@ public class ResponseMainModeThird extends ResponseBase {
                 }
 
                 if (payload instanceof PayloadHash) {
-                    hashMatched = true;
-//                    hashCompare((PayloadHash) payload);
+//                    hashMatched = true;
+                    hashCompare((PayloadHash) payload);
                 }
             }else {
                 break;
