@@ -13,6 +13,7 @@ public class PayloadProposal extends PayloadBase{
     public byte protocolId;
     public byte spiSize;
     public byte transformNumber;
+    public byte[] spiData;
     public List<PayloadTransform> transformList = new ArrayList<>();
 
     public PayloadProposal(ByteBuffer buffer) {
@@ -23,6 +24,11 @@ public class PayloadProposal extends PayloadBase{
             protocolId = buffer.get();
             spiSize = buffer.get();
             transformNumber = buffer.get();
+
+            if (spiSize > 0) {
+                spiData = new byte[spiSize];
+                buffer.get(spiData, 0, spiSize);
+            }
 
             if (transformNumber > 0) {
                 for (int i = 0; i < transformNumber; i++) {

@@ -8,6 +8,7 @@ public abstract class ResponseDecryptBase extends ResponseBase {
     protected byte[] decryptedData;
     protected byte[] hashGenerated;
     protected byte[] hashData;
+    protected int totalLength;
     protected boolean hashMatched;
 
     protected boolean attributesValid;
@@ -39,6 +40,8 @@ public abstract class ResponseDecryptBase extends ResponseBase {
                 next = payload.nextPayload;
                 if (payload instanceof PayloadHash) {
                     hashData = ((PayloadHash) payload).hashData;
+                }else {
+                    totalLength += payload.payloadLength;
                 }
 
                 if (payload instanceof PayloadAttribute) {
@@ -47,13 +50,9 @@ public abstract class ResponseDecryptBase extends ResponseBase {
                         attributeSize = ((PayloadAttribute) payload).attributeList.size();
                         attributeType = ((PayloadAttribute) payload).type;
 
-                        byte[] data = new byte[payload.payloadLength];
-                        System.arraycopy(decryptedData, 36,
-                                data, 0, payload.payloadLength);
-
-                        generateHash(data);
                     }
                 }
+
             }else {
                 break;
             }
@@ -76,7 +75,17 @@ public abstract class ResponseDecryptBase extends ResponseBase {
 
     }
 
-    abstract void generateHash(byte[] data);
+    void generateHash() {
+        byte[] data = new byte[totalLength];
+        System.arraycopy(decryptedData, 36,
+                data, 0, totalLength);
+
+        hashGenerated = KeyExchangeUtil.getInstance().generateHashDataForAttributePayload(
+                Utils.toBytes(isakmpHeader.messageId, 4),
+                data
+        );
+
+    }
 
     abstract boolean prepareIV();
 
@@ -99,7 +108,7 @@ public abstract class ResponseDecryptBase extends ResponseBase {
 
     @Override
     public boolean isValid() {
-        return payloadList.size() > 0 && attributesValid && hashMatched;
+        return payloadList.size() > 0 && hashMatched;
     }
 
 }
