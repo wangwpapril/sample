@@ -12,6 +12,7 @@ import android.widget.Toast;
 
 import com.tenone.testapplication.isakmp.IsakmpHeader;
 import com.tenone.testapplication.isakmp.KeyExchangeUtil;
+import com.tenone.testapplication.isakmp.PayloadAttribute;
 import com.tenone.testapplication.isakmp.PayloadBase;
 import com.tenone.testapplication.isakmp.PayloadKeyEx;
 import com.tenone.testapplication.isakmp.PayloadNonce;
@@ -33,8 +34,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.List;
+import java.security.SecureRandom;
 import java.util.Random;
 
 
@@ -345,7 +345,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 //                    packet.position(0);
 //                    System.arraycopy(packet.array(), 8, mResponderCookie, 0, 8);
 //
-//                    p.put(prepareSecondMsg()).flip();
+//                    p.put(preparePhase1SecondMsg()).flip();
 //
 //                    p.position(0);
 //                    tunnel.write(p);
@@ -357,7 +357,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 //
 //                    if (length > 0) {
 //
-//                        p.put(prepareThirdMsg(packet.array()));
+//                        p.put(preparePhase1ThirdMsg(packet.array()));
 //                    }
 //                }
 //            } catch (InterruptedException e) {
@@ -395,7 +395,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 break;
             case 2:
                 packet.clear();
-                packet.put(prepareSecondMsg(isakmpHeader.toData(4))).flip();
+                packet.put(preparePhase1SecondMsg(isakmpHeader.toData(4))).flip();
                 if(sendMessage(packet, tunnel)) {
                     if (readMessage(packet, tunnel)) {
                         packet.position(0);
@@ -440,7 +440,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     System.arraycopy(hashPayload, 0, combineData, idPayload.length, hashPayload.length);
 
                     byte[] encryptedData = mKeyExchangeUtil.prepare1stEncryptedPayload(combineData, keyData);
-                    packet.put(prepareThirdMsg(isakmpHeader.toData(5, encryptedData.length + 28, flag[0]), encryptedData)).flip();
+                    packet.put(preparePhase1ThirdMsg(isakmpHeader.toData(5, encryptedData.length + 28, flag[0]), encryptedData)).flip();
                     if (sendMessage(packet, tunnel)) {
                         byte[] Iv = new byte[16];
                         System.arraycopy(encryptedData, encryptedData.length - 16, Iv, 0, 16);
@@ -469,7 +469,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         KeyExchangeUtil.getInstance().setIV(response.getNextIv());
 
                         packet.clear();
-                        byte[] payload = preparePhase2FirstMsg(isakmpHeader.toData(8), isakmpHeader.messageId);
+                        byte[] payload = preparePhase2ConfigModeFirstMsg(isakmpHeader.toData(8), isakmpHeader.messageId);
                         packet.put(payload).flip();
 
                         if (sendMessage(packet, tunnel)) {
@@ -488,7 +488,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         KeyExchangeUtil.getInstance().setIV(response.getNextIv());
 
                         packet.clear();
-                        byte[] secondMsg = preparePhase2SecondMsg(isakmpHeader.toData(8), isakmpHeader.messageId);
+                        byte[] secondMsg = preparePhase2ConfigModeSecondMsg(isakmpHeader.toData(8), isakmpHeader.messageId);
                         packet.put(secondMsg).flip();
                         if (sendMessage(packet, tunnel)) {
                             byte[] Iv = new byte[16];
@@ -499,7 +499,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                             Random random = new Random();
                             int messageId = random.nextInt();
                             KeyExchangeUtil.getInstance().preparePhase2IV(Utils.toBytes(messageId, 4));
-                            byte[] thirdMsg = preparePhase2ThirdMsg(isakmpHeader.toData(8, messageId), messageId);
+                            byte[] thirdMsg = preparePhase2ConfigModeThirdMsg(isakmpHeader.toData(8, messageId), messageId);
                             packet.put(thirdMsg).flip();
                             if (sendMessage(packet, tunnel)) {
                                 System.arraycopy(thirdMsg, thirdMsg.length - 16, Iv, 0, 16);
@@ -519,10 +519,27 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     if (response != null && response.isValid()) {
                         responseBase = response;
                         isakmpHeader = response.isakmpHeader;
+                        if (response.payloadList.get(1) instanceof PayloadAttribute) {
+                            byte[] ipAddress = ((PayloadAttribute) response.payloadList.get(1)).attributeList.get(0).value;
+                            byte[] subnet = ((PayloadAttribute) response.payloadList.get(1)).attributeList.get(1).value;
+
+                            packet.clear();
+                            SecureRandom random = new SecureRandom();
+                            int messageId = random.nextInt();
+
+                            byte[] firstMsgQuickMode = preparePhase2QuickModeFirstMsg(isakmpHeader.toData(8, messageId, 32),
+                                    messageId, ipAddress, subnet);
+                            packet.put(firstMsgQuickMode).flip();
+                            if (sendMessage(packet, tunnel)) {
+                                Log.d(TAG, "SENT FIRST MESSAGE IN QUICK MODE");
+                            }
+                        }
+
+
 //                        KeyExchangeUtil.getInstance().setIV(response.getNextIv());
 //
 //                        packet.clear();
-//                        byte[] secondMsg = preparePhase2SecondMsg(isakmpHeader.toData(8), isakmpHeader.messageId);
+//                        byte[] secondMsg = preparePhase2ConfigModeSecondMsg(isakmpHeader.toData(8), isakmpHeader.messageId);
 //                        packet.put(secondMsg).flip();
 //                        if (sendMessage(packet, tunnel)) {
 //                            byte[] Iv = new byte[16];
@@ -533,7 +550,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 //                            Random random = new Random();
 //                            int messageId = random.nextInt();
 //                            KeyExchangeUtil.getInstance().preparePhase2IV(Utils.toBytes(messageId, 4));
-//                            byte[] thirdMsg = preparePhase2ThirdMsg(isakmpHeader.toData(8, messageId), messageId);
+//                            byte[] thirdMsg = preparePhase2ConfigModeThirdMsg(isakmpHeader.toData(8, messageId), messageId);
 //                            packet.put(thirdMsg).flip();
 //                            if (sendMessage(packet, tunnel)) {
 //                                break;
@@ -652,19 +669,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
         byte[] header = prepareHeader(1);
 
-        mSAPayload = prepareSAPayload();
-
-        KeyExchangeUtil.getInstance().setSAPayload(mSAPayload);
-
-        int size = header.length + mSAPayload.length;
-        byte[] payloadLength = Utils.toBytes(size);
-        System.arraycopy(payloadLength, 0, header, 24, 4);
-
-        byte[] firstMsg = new byte[size];
-        System.arraycopy(header, 0, firstMsg, 0, header.length);
-        System.arraycopy(mSAPayload, 0, firstMsg, header.length, mSAPayload.length);
-
-        return firstMsg;
+        return preparePhase1FirstMsg(header);
     }
 
     private byte[] prepareHeader(int nextPayloadType) {
@@ -736,6 +741,23 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return null;
     }
 
+    private byte[] preparePhase1FirstMsg(byte[] header) {
+
+        mSAPayload = prepareSAPayload();
+
+        KeyExchangeUtil.getInstance().setSAPayload(mSAPayload);
+
+        int size = header.length + mSAPayload.length;
+        byte[] payloadLength = Utils.toBytes(size);
+        System.arraycopy(payloadLength, 0, header, 24, 4);
+
+        byte[] firstMsg = new byte[size];
+        System.arraycopy(header, 0, firstMsg, 0, header.length);
+        System.arraycopy(mSAPayload, 0, firstMsg, header.length, mSAPayload.length);
+
+        return firstMsg;
+    }
+
     private byte[] prepareSAPayload() {
 
 
@@ -765,7 +787,11 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
     }
 
-    private byte[] prepareProposalPayload2() {
+    /**
+     * Proposal payload. Currently has only one transform payload which uses AES_CBC for encryption, and SHA2-256 for hash
+     * @return
+     */
+    private byte[] prepareProposalPayload() {
         byte[] nextPayload = new byte[1];
         byte[] reserved = new byte[1];
         //byte[] payloadLength = new byte[2];
@@ -793,19 +819,21 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         System.arraycopy(transformNumber, 0, proposalPayload, 7, 1);
         System.arraycopy(transformPayload1, 0, proposalPayload, 8, transformPayload1.length);
 
-
         return proposalPayload;
-
     }
 
-    private byte[] prepareProposalPayload() {
+    /**
+     * Not using at this time. Propose 15 transforms that we support
+     * @return
+     */
+    private byte[] prepareProposalPayload2() {
         byte[] nextPayload = new byte[1];
         byte[] reserved = new byte[1];
         //byte[] payloadLength = new byte[2];
         byte[] proposalNumber = Utils.toBytes(1, 1);
         byte[] protocolId = Utils.toBytes(1, 1);
         byte[] spiSize = new byte[1];
-        byte[] transformNumber = Utils.toBytes(1, 1);
+        byte[] transformNumber = Utils.toBytes(15, 1);
 
         byte[] transformPayload1 = prepareTransformPayload(1);
         byte[] transformPayload2 = prepareTransformPayload(2);
@@ -931,7 +959,6 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 System.arraycopy(prepareIKEAttribute2(IKE_ATTRIBUTE_12, 3600), 0, attr, 4, 4);
                 System.arraycopy(prepareIKEAttribute2(IKE_ATTRIBUTE_1, 7), 0, attr, 8, 4);
                 System.arraycopy(prepareIKEAttribute2(IKE_ATTRIBUTE_14, 256), 0, attr, 12, 4);
-//            System.arraycopy(prepareIKEAttribute2(IKE_ATTRIBUTE_14, 128), 0, attr, 12, 4);
                 System.arraycopy(prepareIKEAttribute2(IKE_ATTRIBUTE_3, 65001), 0, attr, 16, 4);
                 System.arraycopy(prepareIKEAttribute2(IKE_ATTRIBUTE_2, 4), 0, attr, 20, 4);
                 System.arraycopy(prepareIKEAttribute2(IKE_ATTRIBUTE_4, 14), 0, attr, 24, 4);
@@ -1172,11 +1199,11 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return ikeAttr;
     }
 
-    private byte[] prepareSecondMsg(byte[] header) {
+    private byte[] preparePhase1SecondMsg(byte[] header) {
 
 //        byte[] header = prepareHeader(4);
         byte[] keyExchangePayload = prepareKeyExchangePayload();
-        byte[] noncePayload = prepareNoncePayload();
+        byte[] noncePayload = prepareNoncePayload(0, 1);
 
         int size = header.length + keyExchangePayload.length + noncePayload.length;
 
@@ -1209,11 +1236,11 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return payload;
     }
 
-    private byte[] prepareNoncePayload() {
-        byte[] nextPayload = new byte[1];
+    private byte[] prepareNoncePayload(int nextPayloadNumber, int phaseNumber) {
+        byte[] nextPayload = Utils.toBytes(nextPayloadNumber, 1);
         byte[] reserve = new byte[1];
         //byte[] payloadLength = new byte[2];
-        byte[] nonce = mKeyExchangeUtil.getNonce().toByteArray();
+        byte[] nonce = mKeyExchangeUtil.getNonce(phaseNumber).toByteArray();
 
         int size = nextPayload.length + reserve.length + 2/*payloadLength.length*/ + nonce.length;
         byte[] payloadLength = Utils.toBytes(size, 2);
@@ -1227,7 +1254,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return payload;
     }
 
-    public byte[] preparePhase2FirstMsg(byte[] header, int messageId) {
+    public byte[] preparePhase2ConfigModeFirstMsg(byte[] header, int messageId) {
         byte[] loginConfigPayload = prepareLoginConfigPayload(Utils.toBytes(messageId));
 
         byte[] msg = new byte[header.length + loginConfigPayload.length];
@@ -1238,7 +1265,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return msg;
     }
 
-    public byte[] preparePhase2SecondMsg(byte[] header, int messageId) {
+    public byte[] preparePhase2ConfigModeSecondMsg(byte[] header, int messageId) {
         byte[] ackConfigPayload = prepareAcknowledgeConfigPayload(Utils.toBytes(messageId));
 
         byte[] msg = new byte[header.length + ackConfigPayload.length];
@@ -1256,7 +1283,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         byte[] loginAttributePayload = prepareLoginAttributePayload();
         byte[][] payloads = new byte[1][];
         payloads[0] = loginAttributePayload;
-        byte[] hashData = generateHashDataForAttributePayload(messageId, payloads);
+        byte[] hashData = generateHashDataForPayloads(messageId, payloads);
 
         byte[] payloadLength = Utils.toBytes(nextPayload.length + reserve.length + 2/* payloadLength */ + hashData.length, 2);
         byte[] payloadBeforeEncrypt = new byte[nextPayload.length + reserve.length + 2/* payloadLength */ + hashData.length + loginAttributePayload.length];
@@ -1278,7 +1305,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         byte[] ackAttributePayload = prepareAckAttributePayload();
         byte[][] payloads = new byte[1][];
         payloads[0] = ackAttributePayload;
-        byte[] hashData = generateHashDataForAttributePayload(messageId, payloads);
+        byte[] hashData = generateHashDataForPayloads(messageId, payloads);
 
         byte[] payloadLength = Utils.toBytes(nextPayload.length + reserve.length + 2/* payloadLength */ + hashData.length, 2);
         byte[] payloadBeforeEncrypt = new byte[nextPayload.length + reserve.length + 2/* payloadLength */ + hashData.length + ackAttributePayload.length];
@@ -1324,14 +1351,14 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return payload;
     }
 
-    private byte[] generateHashDataForAttributePayload(byte[] messageId, byte[][] attributePayloads){
+    private byte[] generateHashDataForPayloads(byte[] messageId, byte[][] payloads){
         int length = messageId.length;
         ByteBuffer byteBuffer = ByteBuffer.allocate(DEFAULT_PACKET_SIZE);
         byteBuffer.put(messageId);
 
-        for (int i = 0; i < attributePayloads.length; i++) {
-            byteBuffer.put(attributePayloads[i]);
-            length += attributePayloads[i].length;
+        for (int i = 0; i < payloads.length; i++) {
+            byteBuffer.put(payloads[i]);
+            length += payloads[i].length;
         }
 
         byte[] inputData = new byte[length];
@@ -1404,7 +1431,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return mKeyExchangeUtil.getPublicKey();
     }
 
-    private byte[] prepareThirdMsg(byte[] header, byte[] encryptedData) {
+    private byte[] preparePhase1ThirdMsg(byte[] header, byte[] encryptedData) {
         byte[] msg = new byte[header.length + encryptedData.length];
 
         System.arraycopy(header, 0, msg, 0, header.length);
@@ -1466,13 +1493,69 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return payload;
     }
 
-    public byte[] preparePhase2ThirdMsg(byte[] header, int messageId) {
+    public byte[] preparePhase2ConfigModeThirdMsg(byte[] header, int messageId) {
         byte[] ipConfigPayload = prepareIpConfigPayload(Utils.toBytes(messageId));
 
         byte[] msg = new byte[header.length + ipConfigPayload.length];
         System.arraycopy(header, 0, msg, 0, header.length);
         System.arraycopy(Utils.toBytes(header.length + ipConfigPayload.length), 0, msg, 24, 4);
         System.arraycopy(ipConfigPayload, 0, msg, header.length, ipConfigPayload.length);
+
+        return msg;
+    }
+
+    private byte[] preparePhase2QuickModeFirstMsg(byte[] header, int messageId, byte[] ipAddress, byte[] subnet) {
+
+        byte[] messageIdBytes = Utils.toBytes(messageId);
+        KeyExchangeUtil.getInstance().print("Quick mode 1st message id. ", messageIdBytes);
+        // use the last 16 bytes from last encrypted message in phase 1 + current message id
+        KeyExchangeUtil.getInstance().preparePhase2IV(messageIdBytes);
+
+        byte[] saPayload = preparePhase2SAPayload();
+        KeyExchangeUtil.getInstance().print("saPayload 1st message in quick mode. ", saPayload);
+
+        byte[] noncePayload = prepareNoncePayload(5, 2);
+        KeyExchangeUtil.getInstance().print("noncePayload 1st message in quick mode. ", noncePayload);
+
+        byte[] idPayload1 = preparePhase2IDPayload1(ipAddress);
+        KeyExchangeUtil.getInstance().print("idPayload1 1st message in quick mode. ", idPayload1);
+
+        byte[] idPayload2 = preparePhase2IDPayload2(subnet);
+        KeyExchangeUtil.getInstance().print("idPayload2 1st message in quick mode. ", idPayload2);
+
+        byte[][] allPayloads = new byte[4][];
+        allPayloads[0] = saPayload;
+        allPayloads[1] = noncePayload;
+        allPayloads[2] = idPayload1;
+        allPayloads[3] = idPayload2;
+
+        byte[] hashData = generateHashDataForPayloads(messageIdBytes, allPayloads);
+        KeyExchangeUtil.getInstance().print("hashData 1st message in quick mode. ", hashData);
+
+        byte[] hashPayload = prepareHashPayload(hashData, 1);
+
+        KeyExchangeUtil.getInstance().print("hashPayload 1st message in quick mode. ", hashPayload);
+
+        byte[] dataForEncryption = new byte[hashPayload.length + saPayload.length + noncePayload.length +
+                idPayload1.length + idPayload2.length];
+        System.arraycopy(hashPayload, 0, dataForEncryption, 0, hashPayload.length);
+        System.arraycopy(saPayload, 0, dataForEncryption, hashPayload.length, saPayload.length);
+        System.arraycopy(noncePayload, 0, dataForEncryption, hashPayload.length + saPayload.length, noncePayload.length);
+        System.arraycopy(idPayload1, 0, dataForEncryption, hashPayload.length + saPayload.length + noncePayload.length,
+                idPayload1.length);
+        System.arraycopy(idPayload2, 0, dataForEncryption, hashPayload.length + saPayload.length + noncePayload.length +
+                idPayload1.length, idPayload2.length);
+
+        byte[] encryptedData = KeyExchangeUtil.getInstance().encryptData(dataForEncryption);
+        int len = header.length + encryptedData.length;
+
+        byte[] msg = new byte[len];
+
+        System.arraycopy(header, 0, msg, 0, header.length);
+        System.arraycopy(Utils.toBytes(header.length + encryptedData.length), 0, msg, 24, 4);
+        System.arraycopy(encryptedData, 0, msg, header.length, encryptedData.length);
+
+        KeyExchangeUtil.getInstance().print("1st message in quick mode. ", msg);
 
         return msg;
     }
@@ -1484,7 +1567,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         byte[] ipRequestAttributePayload = prepareIpRequestAttributePayload();
         byte[][] payloads = new byte[1][];
         payloads[0] = ipRequestAttributePayload;
-        byte[] hashData = generateHashDataForAttributePayload(messageId, payloads);
+        byte[] hashData = generateHashDataForPayloads(messageId, payloads);
 
         byte[] payloadLength = Utils.toBytes(nextPayload.length + reserve.length + 2/* payloadLength */ + hashData.length, 2);
         byte[] payloadBeforeEncrypt = new byte[nextPayload.length + reserve.length + 2/* payloadLength */ + hashData.length + ipRequestAttributePayload.length];
@@ -1542,4 +1625,251 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return null;
     }
 
+    private byte[] preparePhase2SAPayload() {
+        byte[] nextPayload = Utils.toBytes(10, 1);
+        byte[] reserved = new byte[1];
+        //byte[] payloadLength = new byte[2];
+        byte[] doi = Utils.toBytes(1);
+        byte[] situation = Utils.toBytes(1);        // SIT_IDENTITY_ONLY
+
+        byte[] proposalPayload = preparePhase2ProposalPayload();
+        int length = nextPayload.length + reserved.length + 2 /*payloadLength */ + doi.length + situation.length + proposalPayload.length;
+        byte[] payloadLength = Utils.toBytes(length, 2);
+        byte[] payload = new byte[length];
+
+        System.arraycopy(nextPayload, 0, payload, 0, nextPayload.length);
+        System.arraycopy(reserved, 0, payload, nextPayload.length, reserved.length);
+        System.arraycopy(payloadLength, 0, payload, nextPayload.length + reserved.length, payloadLength.length);
+        System.arraycopy(doi, 0, payload, nextPayload.length + reserved.length + payloadLength.length, doi.length);
+        System.arraycopy(situation, 0, payload, nextPayload.length + reserved.length + payloadLength.length + doi.length,
+                situation.length);
+        System.arraycopy(proposalPayload, 0, payload, nextPayload.length + reserved.length + payloadLength.length + doi.length +
+                situation.length, proposalPayload.length);
+
+        return payload;
+    }
+
+    /**
+     * First ID payload for IPV4_Address
+     * @param ipAddress
+     * @return
+     */
+    private byte[] preparePhase2IDPayload1(byte[] ipAddress) {
+        byte[] nextPayload = Utils.toBytes(5, 1);
+        byte[] reserved = new byte[1];
+        //byte[] payloadLength = new byte[2];
+        byte[] type = Utils.toBytes(1, 1);  // IPV4_ADDRESS
+        byte[] protocolId = new byte[1];        // 0
+        byte[] port = new byte[2];              // 0
+
+        byte[] data = new byte[4];
+        System.arraycopy(ipAddress, 0, data, 0, data.length);
+
+        int length = nextPayload.length + reserved.length + 2 /*payloadLength*/ +
+                type.length + protocolId.length + port.length + data.length;
+        byte[] payload = new byte[length];
+        byte[] payloadLength = Utils.toBytes(length, 2);
+
+        System.arraycopy(nextPayload, 0, payload, 0, nextPayload.length);
+        System.arraycopy(reserved, 0, payload, nextPayload.length, reserved.length);
+        System.arraycopy(payloadLength, 0, payload, nextPayload.length + reserved.length, payloadLength.length);
+        System.arraycopy(type, 0, payload, nextPayload.length + reserved.length + payloadLength.length,
+                type.length);
+        System.arraycopy(protocolId, 0, payload, nextPayload.length + reserved.length + payloadLength.length +
+                type.length, protocolId.length);
+        System.arraycopy(port, 0, payload, nextPayload.length + reserved.length + payloadLength.length +
+                type.length + protocolId.length, port.length);
+        System.arraycopy(data, 0, payload, nextPayload.length + reserved.length + payloadLength.length +
+                type.length + protocolId.length + port.length, data.length);
+
+        return payload;
+
+    }
+
+    /**
+     * Second ID payload for IPV4_Address_Subnet
+     * @param subnet
+     * @return
+     */
+    private byte[] preparePhase2IDPayload2(byte[] subnet) {
+        byte[] nextPayload = new byte[1];
+        byte[] reserved = new byte[1];
+        //byte[] payloadLength = new byte[2];
+        byte[] type = Utils.toBytes(4, 1);  // IPV4_ADDRESS_SUBNET
+        byte[] protocolId = new byte[1];        // 0
+        byte[] port = new byte[2];              // 0
+
+        byte[] data = new byte[8];
+        System.arraycopy(subnet, 0, data, 0, subnet.length);
+
+        int length = nextPayload.length + reserved.length + 2 /*payloadLength*/ +
+                type.length + protocolId.length + port.length + data.length;
+        byte[] payload = new byte[length];
+        byte[] payloadLength = Utils.toBytes(length, 2);
+
+        System.arraycopy(nextPayload, 0, payload, 0, nextPayload.length);
+        System.arraycopy(reserved, 0, payload, nextPayload.length, reserved.length);
+        System.arraycopy(payloadLength, 0, payload, nextPayload.length + reserved.length, payloadLength.length);
+        System.arraycopy(type, 0, payload, nextPayload.length + reserved.length + payloadLength.length,
+                type.length);
+        System.arraycopy(protocolId, 0, payload, nextPayload.length + reserved.length + payloadLength.length +
+                type.length, protocolId.length);
+        System.arraycopy(port, 0, payload, nextPayload.length + reserved.length + payloadLength.length +
+                type.length + protocolId.length, port.length);
+        System.arraycopy(data, 0, payload, nextPayload.length + reserved.length + payloadLength.length +
+                type.length + protocolId.length + port.length, data.length);
+
+        return payload;
+
+    }
+
+    private byte[] preparePhase2ProposalPayload() {
+        byte[] nextPayload = new byte[1];
+        byte[] reserved = new byte[1];
+        //byte[] payloadLength = new byte[2];
+        byte[] proposalNumber = Utils.toBytes(1, 1);
+        byte[] protocolId = Utils.toBytes(3, 1);        // PROTO_IPSEC_ESP
+        byte[] spiSize = Utils.toBytes(4, 1);
+        byte[] transformNumber = Utils.toBytes(1, 1);
+        byte[] spi = Utils.toBytes(KeyExchangeUtil.getInstance().getSPI());
+
+        byte[] transformPayload1 = preparePhase2TransformPayload(1);
+
+
+        int size = nextPayload.length + reserved.length + 2/*payloadLength.length*/ + proposalNumber.length +
+                protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length;
+
+        byte[] payloadLength = Utils.toBytes(size, 2);
+
+        byte[] proposalPayload = new byte[size];
+
+        System.arraycopy(nextPayload, 0, proposalPayload, 0, nextPayload.length);
+        System.arraycopy(reserved, 0, proposalPayload, nextPayload.length, reserved.length);
+        System.arraycopy(payloadLength, 0, proposalPayload, nextPayload.length + reserved.length, payloadLength.length);
+        System.arraycopy(proposalNumber, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length,
+                proposalNumber.length);
+        System.arraycopy(protocolId, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length, protocolId.length);
+        System.arraycopy(spiSize, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length, spiSize.length);
+        System.arraycopy(transformNumber, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length, transformNumber.length);
+        System.arraycopy(spi, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length, spiSize.length);
+        System.arraycopy(transformPayload1, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length, transformPayload1.length);
+
+        return proposalPayload;
+    }
+
+    private byte[] preparePhase2TransformPayload(int transformNumber) {
+        byte[] nextPayload = new byte[1];
+        byte[] reserved = new byte[1];
+        //byte[] payloadLength = new byte[2];
+        byte[] transformNum = Utils.toBytes(1, 1);
+        byte[] transformID = Utils.toBytes(12, 1);
+        byte[] reserved2 = new byte[2];
+
+        byte[] attributes = prepareDOIAttribute1(1);
+
+        int length = nextPayload.length + reserved.length + 2/*payloadLength*/ + transformNum.length
+                + transformID.length + reserved2.length + attributes.length;
+        byte[] payload = new byte[length];
+        byte[] payloadLength = Utils.toBytes(length, 2);
+
+        System.arraycopy(nextPayload, 0, payload, 0, nextPayload.length);
+        System.arraycopy(reserved, 0, payload, nextPayload.length, reserved.length);
+        System.arraycopy(payloadLength, 0, payload, nextPayload.length + reserved.length, payloadLength.length);
+        System.arraycopy(transformNum, 0, payload, nextPayload.length + reserved.length + payloadLength.length,
+                transformNum.length);
+        System.arraycopy(transformID, 0, payload, nextPayload.length + reserved.length + payloadLength.length +
+                transformNum.length, transformID.length);
+        System.arraycopy(reserved2, 0, payload, nextPayload.length + reserved.length + payloadLength.length +
+                transformNum.length + transformID.length, reserved2.length);
+        System.arraycopy(attributes, 0, payload, nextPayload.length + reserved.length + payloadLength.length +
+                transformNum.length + transformID.length + reserved2.length, attributes.length);
+
+        return payload;
+    }
+
+    private byte[] prepareDOIAttribute1(int transformNumber) {
+        byte[] attributes = new byte[20];
+
+        switch (transformNumber) {
+        case 1:
+            System.arraycopy(prepareDOIAttribute2(1, 1), 0, attributes, 0, 4);
+            System.arraycopy(prepareDOIAttribute2(2, 28800), 0, attributes, 4, 4);
+            System.arraycopy(prepareDOIAttribute2(4, 3), 0, attributes, 8, 4);
+            System.arraycopy(prepareDOIAttribute2(5, 5), 0, attributes, 12, 4);
+            System.arraycopy(prepareDOIAttribute2(6, 256), 0, attributes, 16, 4);
+            break;
+
+        default:
+            break;
+        }
+
+        return attributes;
+    }
+
+    private byte[] prepareDOIAttribute2(int type, int value) {
+        byte[] attributeType = null;
+        byte[] attributeValue = null;
+        byte[] output = null;
+
+        switch (type) {
+        case 1: // SA_LIFE_TYPE and Seconds
+            attributeType = Utils.toBytes(0x8001, 2);
+            attributeValue = Utils.toBytes(value, 2);
+            break;
+
+        case 2: // SA_LIFE_DURATION
+            attributeType = Utils.toBytes(0x8002, 2);
+            attributeValue = Utils.toBytes(value, 2);
+            break;
+
+        case 4: // ENCAPSULATION_MODE. ENCAPSULATION_MODE_UDP_TUNNEL_RFC
+            attributeType = Utils.toBytes(0x8004, 2);
+            attributeValue = Utils.toBytes(value, 2);
+            break;
+
+        case 5: // AUTH_ALGORITHM. AUTH_ALGORITHM_HMAC_SHA2_256
+            attributeType = Utils.toBytes(0x8005, 2);
+            attributeValue = Utils.toBytes(value, 2);
+            break;
+
+        case 6: // KEY_LENGTH.
+            attributeType = Utils.toBytes(0x8006, 2);
+            attributeValue = Utils.toBytes(value, 2);
+            break;
+
+        default:
+            break;
+        }
+
+        if (attributeType == null || attributeValue == null) {
+            return output;
+        }
+
+        output = new byte[attributeType.length + attributeValue.length];
+        System.arraycopy(attributeType, 0, output, 0, attributeType.length);
+        System.arraycopy(attributeValue, 0, output, attributeType.length, attributeValue.length);
+
+        return output;
+    }
+
+    private byte[] prepareHashPayload(byte[] hashData, int nextPayloadNum) {
+        byte[] nextPayload = Utils.toBytes(nextPayloadNum, 1);
+        byte[] reserved = new byte[1];
+
+        int len = nextPayload.length + reserved.length + 2 /*payloadLength*/ + hashData.length;
+        byte[] payloadLength = Utils.toBytes(len, 2);
+        byte[] payload = new byte[len];
+
+        System.arraycopy(nextPayload, 0, payload, 0, nextPayload.length);
+        System.arraycopy(reserved, 0, payload, nextPayload.length, reserved.length);
+        System.arraycopy(payloadLength, 0, payload, nextPayload.length + reserved.length, payloadLength.length);
+        System.arraycopy(hashData, 0, payload, nextPayload.length + reserved.length + payloadLength.length, hashData.length);
+
+        return payload;
+    }
 }

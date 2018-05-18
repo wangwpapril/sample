@@ -41,6 +41,8 @@ public class KeyExchangeUtil {
     private BigInteger mDH_P;
     private BigInteger mDH_G;
     private BigInteger mNonce;
+    private BigInteger mNoncePhase2;
+    private int mSPI;
     private String mPreSharedSecret;
     private byte[] mSharedSecret;   // session key
     private byte[] mSKEYID;
@@ -132,8 +134,15 @@ public class KeyExchangeUtil {
         return mDH_P;
     }
 
-    public BigInteger getNonce() {
+    public BigInteger getNonce(int phaseNumber) {
+        if (phaseNumber == 2) {
+            return mNoncePhase2;
+        }
         return mNonce;
+    }
+
+    public int getSPI() {
+        return mSPI;
     }
 
     /**
@@ -442,6 +451,11 @@ public class KeyExchangeUtil {
         byte[] bytes = new byte[16];
         random.nextBytes(bytes);
         mNonce = new BigInteger(bytes);
+        random.nextBytes(bytes);
+        mNoncePhase2 = new BigInteger(bytes);
+        while (mSPI <= 4096 /*IPSEC_DOI_SPI_OUR_MIN*/) {
+            mSPI = random.nextInt();
+        }
     }
 
     private byte[] hashDataWithKey(byte[] key, byte[] data) {

@@ -89,6 +89,23 @@ public class IsakmpHeader {
 
     }
 
+    public byte[] toData(int nextPayloadType, int messageId, int exchangeType) {
+        this.nextPayloadType = nextPayloadType;
+        this.messageId = messageId;
+        this.exchangeType = toBytes(exchangeType, 1)[0];
+        if (!ready) {
+            prepareHeader();
+        }else {
+            byte[] nextPayload = toBytes(nextPayloadType, 1);    // Security Association
+            System.arraycopy(nextPayload, 0, headerData, 16, 1);
+            System.arraycopy(toBytes(exchangeType, 1), 0, headerData, 18, 1);
+            System.arraycopy(toBytes(messageId, 4), 0, headerData, 20, 4);
+        }
+
+        return headerData;
+
+    }
+
     public byte[] toData(int nextPayloadType, int length, byte flag) {
         this.nextPayloadType = nextPayloadType;
         this.flags = flag;
