@@ -16,9 +16,23 @@ public class ResponseQuickModeFirst extends ResponseDecryptBase {
     @Override
     void parseData(ByteBuffer buffer) {
         super.parseData(buffer);
-//        generateHash();
-//        hashCompare();
-        hashMatched = true;
+        generateHash();
+        hashCompare();
+    }
+
+    @Override
+    void generateHash() {
+        byte[] nibody = KeyExchangeUtil.getInstance().getNonce(2).toByteArray();
+        byte[] data = new byte[totalLength + nibody.length];
+        System.arraycopy(nibody, 0, data, 0, nibody.length);
+        System.arraycopy(decryptedData, 36,
+                data, nibody.length, totalLength);
+
+        hashGenerated = KeyExchangeUtil.getInstance().generateHashDataForAttributePayload(
+                Utils.toBytes(isakmpHeader.messageId, 4),
+                data
+        );
+
     }
 
     @Override
