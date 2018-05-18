@@ -10,6 +10,7 @@ import android.util.Log;
 import android.widget.Toast;
 
 
+import com.android.internal.app.AlertActivity;
 import com.tenone.testapplication.isakmp.IsakmpHeader;
 import com.tenone.testapplication.isakmp.KeyExchangeUtil;
 import com.tenone.testapplication.isakmp.PayloadAttribute;
@@ -27,11 +28,15 @@ import com.tenone.testapplication.isakmp.ResponseMainModeThird;
 import com.tenone.testapplication.isakmp.ResponseQuickModeFirst;
 import com.tenone.testapplication.isakmp.Utils;
 
+import org.spongycastle.util.IPAddress;
+
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.security.MessageDigest;
@@ -92,7 +97,9 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
     IsakmpHeader isakmpHeader;
     byte[] keyData;
     byte[] nonceData;
-
+    byte[] ipAddress;
+    byte[] dns;
+    byte[] subnet;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -134,8 +141,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             mKeyExchangeUtil.setPreSharedKey("test4stagwell");
             mKeyExchangeUtil.setHashAlgorithm("HmacSHA256");
             mKeyExchangeUtil.setEncryptAlgorithm("AES256");
-            //Intent pendingIntent = new Intent(this, AlertActivity.class);
-            //configureIntent = PendingIntent.getActivity(this, REQUEST_CODE, pendingIntent, DEFAULT_INTENT_FLAG);
+            Intent pendingIntent = new Intent(this, AlertActivity.class);
+            configureIntent = PendingIntent.getActivity(this, REQUEST_CODE, pendingIntent, DEFAULT_INTENT_FLAG);
 
             // Start a new session by creating a new thread.
             vpnThread = new Thread(this, TAG);
@@ -288,7 +295,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     }
                     // We are sending for a long time but not receiving.
                     if (timer > DEFAULT_TIMER_MAX) {
-                        throw new IllegalStateException("Timed out");
+//                        throw new IllegalStateException("Timed out");
                     }
                 }
             }
@@ -522,8 +529,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         responseBase = response;
                         isakmpHeader = response.isakmpHeader;
                         if (response.payloadList.get(1) instanceof PayloadAttribute) {
-                            byte[] ipAddress = ((PayloadAttribute) response.payloadList.get(1)).attributeList.get(0).value;
-                            byte[] subnet = ((PayloadAttribute) response.payloadList.get(1)).attributeList.get(1).value;
+                            ipAddress = ((PayloadAttribute) response.payloadList.get(1)).attributeList.get(0).value;
+                            subnet = ((PayloadAttribute) response.payloadList.get(1)).attributeList.get(1).value;
 
                             packet.clear();
                             SecureRandom random = new SecureRandom();
@@ -566,6 +573,9 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         break;
                     }
                 }
+                break;
+            case 8:
+                setUp();
                 break;
             default:
                 break;
@@ -618,6 +628,48 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         fileDescriptor = builder.setSession(mServerAddress)
                 .setConfigureIntent(configureIntent)
                 .establish();
+    }
+
+    private void setUp() {
+        if (fileDescriptor != null) {
+            Log.d(TAG, "Using the previous interface");
+            return;
+        }
+        InetAddress ia = null;
+        InetAddress ir = null;
+//        byte[] rr = new byte[]{(byte)0,(byte)0,(byte)0,(byte)0};
+        try {
+            ia = InetAddress.getByAddress(ipAddress);
+            ir = InetAddress.getByAddress(subnet);
+//            InetAddress in = InetAddress.getByAddress(subnet);
+//            address = ia.toString();
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        }
+
+
+        // Configure a builder while parsing the parameters.
+        Builder builder = new Builder();
+
+        builder.setMtu(15000);
+        builder.addAddress(ia, 0);
+//        builder.addAddress("10.10.68.200", 0);
+        builder.addRoute(ir, 0);
+//        builder.addRoute("0.0.0.0", 0);
+        builder.addDnsServer("8.8.4.4");
+
+        // Close the old interface since the parameters have been changed.
+//        try {
+//            fileDescriptor.close();
+//        } catch (IOException e) {
+//            Log.e(TAG, "File descriptor is already closed " + e);
+//        }
+//        // Create a new interface using the builder and save the parameters.
+        fileDescriptor = builder.setSession(mServerAddress)
+//                .setConfigureIntent(configureIntent)
+                .establish();
+//        vpnParameters = parameters;
+//        Log.d(TAG, "New interface: " + parameters);
     }
 
     private void configure(String parameters) {
