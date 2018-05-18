@@ -21,15 +21,6 @@ public class ResponseConfigModeThird extends ResponseDecryptBase {
     }
 
     @Override
-    void generateHash(byte[] payload) {
-        hashGenerated = KeyExchangeUtil.getInstance().generateHashDataForAttributePayload(
-                Utils.toBytes(isakmpHeader.messageId, 4),
-                payload
-        );
-
-    }
-
-    @Override
     boolean prepareIV() {
         return true;
     }

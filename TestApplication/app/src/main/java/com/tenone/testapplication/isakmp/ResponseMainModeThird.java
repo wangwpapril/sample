@@ -37,11 +37,6 @@ public class ResponseMainModeThird extends ResponseDecryptBase {
     }
 
     @Override
-    void generateHash(byte[] data) {
-
-    }
-
-    @Override
     boolean prepareIV() {
         return true;
     }

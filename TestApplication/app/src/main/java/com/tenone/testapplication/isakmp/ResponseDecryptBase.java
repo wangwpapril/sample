@@ -76,7 +76,13 @@ public abstract class ResponseDecryptBase extends ResponseBase {
 
     }
 
-    abstract void generateHash(byte[] data);
+    void generateHash(byte[] data) {
+        hashGenerated = KeyExchangeUtil.getInstance().generateHashDataForAttributePayload(
+                Utils.toBytes(isakmpHeader.messageId, 4),
+                data
+        );
+
+    }
 
     abstract boolean prepareIV();
 
