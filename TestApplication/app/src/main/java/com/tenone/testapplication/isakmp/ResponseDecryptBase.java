@@ -108,7 +108,7 @@ public abstract class ResponseDecryptBase extends ResponseBase {
 
     @Override
     public boolean isValid() {
-        return payloadList.size() > 0 && attributesValid && hashMatched;
+        return payloadList.size() > 0 && hashMatched;
     }
 
 }

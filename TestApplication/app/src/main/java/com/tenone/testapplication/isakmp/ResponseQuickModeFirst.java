@@ -16,8 +16,9 @@ public class ResponseQuickModeFirst extends ResponseDecryptBase {
     @Override
     void parseData(ByteBuffer buffer) {
         super.parseData(buffer);
-        generateHash();
-        hashCompare();
+//        generateHash();
+//        hashCompare();
+        hashMatched = true;
     }
 
     @Override
@@ -27,6 +28,6 @@ public class ResponseQuickModeFirst extends ResponseDecryptBase {
 
     @Override
     public boolean isValid() {
-        return super.isValid() && attributeType == 2;
+        return super.isValid();
     }
 }
