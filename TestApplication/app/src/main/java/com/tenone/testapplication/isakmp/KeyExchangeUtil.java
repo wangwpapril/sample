@@ -11,6 +11,7 @@ import org.spongycastle.crypto.params.KeyParameter;
 import org.spongycastle.crypto.params.ParametersWithIV;
 
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
@@ -398,6 +399,16 @@ public class KeyExchangeUtil {
         }
 
         return null;
+    }
+
+    public byte[] generateHashDataForAttributePayload(byte[] messageId, byte[] attributePayloads){
+        int length = messageId.length + attributePayloads.length;
+
+        byte[] inputData = new byte[length];
+        System.arraycopy(messageId, 0, inputData, 0, messageId.length);
+        System.arraycopy(attributePayloads, 0, inputData, messageId.length, attributePayloads.length);
+
+        return hashConfigModePayload(inputData);
     }
 
     public byte[] hashConfigModePayload(byte[] data) {

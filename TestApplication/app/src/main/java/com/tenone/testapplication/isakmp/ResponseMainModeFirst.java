@@ -2,7 +2,7 @@ package com.tenone.testapplication.isakmp;
 
 import java.nio.ByteBuffer;
 
-public class ResponseMainModeFirst extends ResponseBase {
+public class ResponseMainModeFirst extends ResponseCommonBase {
 
     public ResponseMainModeFirst(ByteBuffer buffer) {
         super(buffer);
@@ -10,23 +10,13 @@ public class ResponseMainModeFirst extends ResponseBase {
 
     @Override
     boolean isDataValid() {
-        return (isakmpHeader != null
-                && !isakmpHeader.isEncrypted()
+        return (super.isDataValid()
                 &&  isakmpHeader.exchangeType == Constants.EXCHANGE_TYPE_MAIN_MODE);
     }
 
     @Override
     void parseData(ByteBuffer buffer) {
-        while (next > 0) {
-            PayloadBase payload = parsePayload(next, buffer);
-            if (payload != null) {
-                payloadList.add(payload);
-                next = payload.nextPayload;
-            }else {
-                break;
-            }
-        }
-
+        super.parseData(buffer);
     }
 
     @Override
