@@ -19,6 +19,7 @@ import com.tenone.testapplication.isakmp.ResponseBase;
 import com.tenone.testapplication.isakmp.ResponseConfigModeFirst;
 import com.tenone.testapplication.isakmp.ResponseConfigModeSecond;
 import com.tenone.testapplication.isakmp.ResponseConfigModeThird;
+import com.tenone.testapplication.isakmp.ResponseDecryptBase;
 import com.tenone.testapplication.isakmp.ResponseMainModeFirst;
 import com.tenone.testapplication.isakmp.ResponseMainModeSecond;
 import com.tenone.testapplication.isakmp.ResponseMainModeThird;
@@ -462,7 +463,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             case 4:
                 while (readMessage(packet, tunnel)) {
                     packet.position(0);
-                    ResponseBase response = new ResponseConfigModeFirst(packet);
+                    ResponseConfigModeFirst response = new ResponseConfigModeFirst(packet);
                     if (response != null && response.isValid()) {
                         responseBase = response;
                         isakmpHeader = response.isakmpHeader;
@@ -481,7 +482,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             case 5:
                 while (readMessage(packet, tunnel)) {
                     packet.position(0);
-                    ResponseBase response = new ResponseConfigModeSecond(packet);
+                    ResponseConfigModeSecond response = new ResponseConfigModeSecond(packet);
                     if (response != null && response.isValid()) {
                         responseBase = response;
                         isakmpHeader = response.isakmpHeader;

@@ -2,8 +2,7 @@ package com.tenone.testapplication.isakmp;
 
 import java.nio.ByteBuffer;
 
-public class ResponseConfigModeSecond extends ResponseBase {
-    private boolean attributesValid;
+public class ResponseConfigModeSecond extends ResponseDecryptBase {
 
     public ResponseConfigModeSecond(ByteBuffer buffer) {
         super(buffer);
@@ -11,48 +10,33 @@ public class ResponseConfigModeSecond extends ResponseBase {
 
     @Override
     boolean isDataValid() {
-        return (isakmpHeader != null
-                && isakmpHeader.isEncrypted()
+        return (super.isDataValid()
                 && isakmpHeader.exchangeType == Constants.EXCHANGE_TYPE_CONFIG_MODE);
     }
 
     @Override
     void parseData(ByteBuffer buffer) {
-        if (next == Constants.ISAKMP_NPTYPE_HASH)
-            KeyExchangeUtil.getInstance().preparePhase2IV(Utils.toBytes(isakmpHeader.messageId, 4));
+        super.parseData(buffer);
+        hashCompare();
+    }
 
-        encryptedData = new byte[isakmpHeader.payloadLength - 28];
-        buffer.get(encryptedData, 0, isakmpHeader.payloadLength - 28);
-        byte[] decryptedData = KeyExchangeUtil.getInstance().decryptData(encryptedData);
-        if (decryptedData != null) {
-            buffer.clear();
-            buffer.put(decryptedData);
-            buffer.position(0);
-        }else {
-            buffer.clear();
-            next = 0;
-        }
-
-        while (next > 0) {
-            PayloadBase payload = parsePayload(next, buffer);
-            if (payload != null) {
-                payloadList.add(payload);
-                next = payload.nextPayload;
-                if (payload instanceof PayloadAttribute) {
-                    if (((PayloadAttribute) payload).attributeList != null
-                            && ((PayloadAttribute) payload).attributeList.size() == 1) {
-                        attributesValid = true;
-                    }
-                }
-            }else {
-                break;
-            }
-        }
+    @Override
+    void generateHash(byte[] payload) {
+        hashGenerated = KeyExchangeUtil.getInstance().generateHashDataForAttributePayload(
+                Utils.toBytes(isakmpHeader.messageId, 4),
+                payload
+        );
 
     }
 
     @Override
+    boolean prepareIV() {
+        KeyExchangeUtil.getInstance().preparePhase2IV(Utils.toBytes(isakmpHeader.messageId, 4));
+        return true;
+    }
+
+    @Override
     public boolean isValid() {
-        return isakmpHeader != null && payloadList.size() > 0 && attributesValid;
+        return super.isValid() && attributeSize == 1;
     }
 }
