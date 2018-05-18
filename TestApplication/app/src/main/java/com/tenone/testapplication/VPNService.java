@@ -547,10 +547,22 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             case 7:
                 while (readMessage(packet, tunnel)) {
                     packet.position(0);
+
                     ResponseQuickModeFirst response = new ResponseQuickModeFirst(packet);
                     if (response != null && response.isValid()) {
                         responseBase = response;
                         isakmpHeader = response.isakmpHeader;
+
+                        KeyExchangeUtil.getInstance().setIV(response.getNextIv());
+
+                        packet.clear();
+                        byte[] responderNonce = ((PayloadNonce)response.payloadList.get(2)).nonceData;
+                        byte[] lastMsg = preparePhase2QuickModeSecondMsg(isakmpHeader.toData(8),
+                                isakmpHeader.messageId, responderNonce);
+                        packet.put(lastMsg).flip();
+                        if (sendMessage(packet, tunnel)) {
+                            Log.d(TAG, "Sent last message in quick mode");
+                        }
                         break;
                     }
                 }
@@ -1555,13 +1567,15 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
     }
 
     private byte[] preparePhase2QuickModeSecondMsg(byte[] header, int messageId, byte[] responderNonce) {
-
+        byte[] zero = new byte[1];
         byte[] nonce = KeyExchangeUtil.getInstance().getNonce(2).toByteArray();
         byte[] messageIdBytes = Utils.toBytes(messageId);
-        byte[] dataForHash = new byte[messageIdBytes.length + nonce.length + responderNonce.length];
-        System.arraycopy(messageIdBytes, 0, dataForHash, 0, messageIdBytes.length);
-        System.arraycopy(nonce, 0, dataForHash, messageIdBytes.length, nonce.length);
-        System.arraycopy(responderNonce, 0, dataForHash, messageIdBytes.length + nonce.length, responderNonce.length);
+        byte[] dataForHash = new byte[zero.length + messageIdBytes.length + nonce.length + responderNonce.length];
+        System.arraycopy(zero, 0, dataForHash, 0, zero.length);
+        System.arraycopy(messageIdBytes, 0, dataForHash, zero.length, messageIdBytes.length);
+        System.arraycopy(nonce, 0, dataForHash, zero.length + messageIdBytes.length, nonce.length);
+        System.arraycopy(responderNonce, 0, dataForHash,
+                zero.length + messageIdBytes.length + nonce.length, responderNonce.length);
         byte[] hashData = KeyExchangeUtil.getInstance().generateHashDataForLastMsg(dataForHash);
 
         byte[] nextPayload = new byte[1];
