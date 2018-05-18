@@ -1561,6 +1561,38 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return msg;
     }
 
+    private byte[] preparePhase2QuickModeSecondMsg(byte[] header, int messageId, byte[] responderNonce) {
+
+        byte[] nonce = KeyExchangeUtil.getInstance().getNonce(2).toByteArray();
+        byte[] messageIdBytes = Utils.toBytes(messageId);
+        byte[] dataForHash = new byte[messageIdBytes.length + nonce.length + responderNonce.length];
+        System.arraycopy(messageIdBytes, 0, dataForHash, 0, messageIdBytes.length);
+        System.arraycopy(nonce, 0, dataForHash, messageIdBytes.length, nonce.length);
+        System.arraycopy(responderNonce, 0, dataForHash, messageIdBytes.length + nonce.length, responderNonce.length);
+        byte[] hashData = KeyExchangeUtil.getInstance().generateHashDataForLastMsg(dataForHash);
+
+        byte[] nextPayload = new byte[1];
+        byte[] reserved = new byte[1];
+        int hashPayloadLen = nextPayload.length + reserved.length + 2 + hashData.length;
+        byte[] hashPayloadLength = Utils.toBytes(hashPayloadLen, 2);
+        byte[] hashPayload = new byte[hashPayloadLen];
+
+        System.arraycopy(nextPayload, 0, hashPayload, 0, nextPayload.length);
+        System.arraycopy(reserved, 0, hashPayload, nextPayload.length, reserved.length);
+        System.arraycopy(hashPayloadLength, 0, hashPayload, nextPayload.length + reserved.length, hashPayloadLength.length);
+        System.arraycopy(hashData, 0, hashPayload, nextPayload.length + reserved.length + hashPayloadLength.length, hashData.length);
+
+        byte[] encryptedData = KeyExchangeUtil.getInstance().encryptData(hashPayload);
+        int totalLen = header.length + encryptedData.length;
+        byte[] msg = new byte[totalLen];
+
+        System.arraycopy(header, 0, msg, 0, header.length);
+        System.arraycopy(Utils.toBytes(totalLen), 0, msg, 24, 4);
+        System.arraycopy(encryptedData, 0, msg, header.length, encryptedData.length);
+
+        return msg;
+    }
+
     public byte[] prepareIpConfigPayload(byte[] messageId) {
         byte[] nextPayload = Utils.toBytes(14, 1);
         byte[] reserve = new byte[1];

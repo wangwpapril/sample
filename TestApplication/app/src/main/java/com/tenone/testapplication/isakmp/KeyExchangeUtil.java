@@ -411,6 +411,10 @@ public class KeyExchangeUtil {
         return hashConfigModePayload(inputData);
     }
 
+    public byte[] generateHashDataForLastMsg(byte[] data) {
+        return hashDataWithKey(mSKEYIDa, data);
+    }
+
     public byte[] hashConfigModePayload(byte[] data) {
         byte[] output = hashDataWithKey(mSKEYIDa, data);
 
