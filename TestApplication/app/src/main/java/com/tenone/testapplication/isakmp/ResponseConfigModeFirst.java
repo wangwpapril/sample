@@ -17,6 +17,7 @@ public class ResponseConfigModeFirst extends ResponseDecryptBase {
     @Override
     void parseData(ByteBuffer buffer) {
         super.parseData(buffer);
+        generateHash();
         hashCompare();
     }
 

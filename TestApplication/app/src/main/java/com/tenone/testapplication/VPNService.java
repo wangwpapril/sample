@@ -24,6 +24,7 @@ import com.tenone.testapplication.isakmp.ResponseDecryptBase;
 import com.tenone.testapplication.isakmp.ResponseMainModeFirst;
 import com.tenone.testapplication.isakmp.ResponseMainModeSecond;
 import com.tenone.testapplication.isakmp.ResponseMainModeThird;
+import com.tenone.testapplication.isakmp.ResponseQuickModeFirst;
 import com.tenone.testapplication.isakmp.Utils;
 
 import java.io.FileInputStream;
@@ -533,31 +534,23 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                             packet.put(firstMsgQuickMode).flip();
                             if (sendMessage(packet, tunnel)) {
                                 Log.d(TAG, "SENT FIRST MESSAGE IN QUICK MODE");
+                                byte[] Iv = new byte[16];
+                                System.arraycopy(firstMsgQuickMode, firstMsgQuickMode.length - 16, Iv, 0, 16);
+                                KeyExchangeUtil.getInstance().setIV(Iv);
+
                             }
                         }
-
-
-//                        KeyExchangeUtil.getInstance().setIV(response.getNextIv());
-//
-//                        packet.clear();
-//                        byte[] secondMsg = preparePhase2ConfigModeSecondMsg(isakmpHeader.toData(8), isakmpHeader.messageId);
-//                        packet.put(secondMsg).flip();
-//                        if (sendMessage(packet, tunnel)) {
-//                            byte[] Iv = new byte[16];
-//                            System.arraycopy(secondMsg, secondMsg.length - 16, Iv, 0, 16);
-//                            KeyExchangeUtil.getInstance().setIV(Iv);
-//
-//                            packet.clear();
-//                            Random random = new Random();
-//                            int messageId = random.nextInt();
-//                            KeyExchangeUtil.getInstance().preparePhase2IV(Utils.toBytes(messageId, 4));
-//                            byte[] thirdMsg = preparePhase2ConfigModeThirdMsg(isakmpHeader.toData(8, messageId), messageId);
-//                            packet.put(thirdMsg).flip();
-//                            if (sendMessage(packet, tunnel)) {
-//                                break;
-//                            }
-//                        }
-//
+                        break;
+                    }
+                }
+                break;
+            case 7:
+                while (readMessage(packet, tunnel)) {
+                    packet.position(0);
+                    ResponseQuickModeFirst response = new ResponseQuickModeFirst(packet);
+                    if (response != null && response.isValid()) {
+                        responseBase = response;
+                        isakmpHeader = response.isakmpHeader;
                         break;
                     }
                 }

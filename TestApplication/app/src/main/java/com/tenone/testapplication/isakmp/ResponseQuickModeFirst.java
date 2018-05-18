@@ -2,16 +2,15 @@ package com.tenone.testapplication.isakmp;
 
 import java.nio.ByteBuffer;
 
-public class ResponseConfigModeSecond extends ResponseDecryptBase {
-
-    public ResponseConfigModeSecond(ByteBuffer buffer) {
+public class ResponseQuickModeFirst extends ResponseDecryptBase {
+    public ResponseQuickModeFirst(ByteBuffer buffer) {
         super(buffer);
     }
 
     @Override
     boolean isDataValid() {
         return (super.isDataValid()
-                && isakmpHeader.exchangeType == Constants.EXCHANGE_TYPE_CONFIG_MODE);
+                && isakmpHeader.exchangeType == Constants.EXCHANGE_TYPE_QUICK_MODE);
     }
 
     @Override
@@ -23,12 +22,11 @@ public class ResponseConfigModeSecond extends ResponseDecryptBase {
 
     @Override
     boolean prepareIV() {
-        KeyExchangeUtil.getInstance().preparePhase2IV(Utils.toBytes(isakmpHeader.messageId, 4));
         return true;
     }
 
     @Override
     public boolean isValid() {
-        return super.isValid() && attributeSize == 1;
+        return super.isValid() && attributeType == 2;
     }
 }
