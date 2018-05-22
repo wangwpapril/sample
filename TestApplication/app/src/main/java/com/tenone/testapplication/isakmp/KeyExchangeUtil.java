@@ -19,6 +19,7 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.util.Random;
@@ -472,6 +473,18 @@ public class KeyExchangeUtil {
         while (mSPI <= 4096 /*IPSEC_DOI_SPI_OUR_MIN*/) {
             mSPI = random.nextInt();
         }
+    }
+
+    public byte[] md5Hash(byte[] data) {
+        try {
+            MessageDigest messageDigest = MessageDigest.getInstance("MD5");
+            messageDigest.update(data);
+            return messageDigest.digest();
+        }catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+
+        return null;
     }
 
     public byte[] hashDataWithoutKey(byte[] data) {

@@ -803,13 +803,16 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
         KeyExchangeUtil.getInstance().setSAPayload(mSAPayload);
 
-        int size = header.length + mSAPayload.length;
+        byte[] vidPayloads = prepareVendorIDPayloads();
+
+        int size = header.length + mSAPayload.length + vidPayloads.length;
         byte[] payloadLength = Utils.toBytes(size);
         System.arraycopy(payloadLength, 0, header, 24, 4);
 
         byte[] firstMsg = new byte[size];
         System.arraycopy(header, 0, firstMsg, 0, header.length);
         System.arraycopy(mSAPayload, 0, firstMsg, header.length, mSAPayload.length);
+        System.arraycopy(vidPayloads, 0, firstMsg, header.length + mSAPayload.length, vidPayloads.length);
 
         return firstMsg;
     }
@@ -817,7 +820,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
     private byte[] prepareSAPayload() {
 
 
-        byte[] nextPayload = new byte[1];
+        byte[] nextPayload = Utils.toBytes(13, 1);
         //nextPayload[0] = 0;
         byte[] reserved = new byte[1];
         //byte[] payloadLength = new byte[2];
@@ -1253,6 +1256,109 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         System.arraycopy(attribute2ndPart, 0, ikeAttr, 2, 2);
 
         return ikeAttr;
+    }
+
+    private byte[] prepareVendorIDPayloads() {
+        byte[] vid_payload1 = prepareVendorPayload(1);
+        byte[] vid_payload2 = prepareVendorPayload(2);
+        byte[] vid_payload3 = prepareVendorPayload(3);
+        byte[] vid_payload4 = prepareVendorPayload(4);
+        byte[] vid_payload5 = prepareVendorPayload(5);
+        byte[] vid_payload6 = prepareVendorPayload(6);
+        byte[] vid_payload7 = prepareVendorPayload(7);
+        byte[] vid_payload8 = prepareVendorPayload(8);
+
+        byte[] allVidPayloads = new byte[vid_payload1.length + vid_payload2.length + vid_payload3.length +
+                vid_payload4.length + vid_payload5.length + vid_payload6.length + vid_payload7.length + vid_payload8.length];
+
+        System.arraycopy(vid_payload1, 0, allVidPayloads, 0, vid_payload1.length);
+        System.arraycopy(vid_payload2, 0, allVidPayloads, vid_payload1.length, vid_payload2.length);
+        System.arraycopy(vid_payload3, 0, allVidPayloads, vid_payload1.length + vid_payload2.length, vid_payload3.length);
+        System.arraycopy(vid_payload4, 0, allVidPayloads,
+                vid_payload1.length + vid_payload2.length + vid_payload3.length, vid_payload4.length);
+        System.arraycopy(vid_payload5, 0, allVidPayloads,
+                vid_payload1.length + vid_payload2.length + vid_payload3.length + vid_payload4.length, vid_payload5.length);
+        System.arraycopy(vid_payload6, 0, allVidPayloads,
+                vid_payload1.length + vid_payload2.length + vid_payload3.length + vid_payload4.length + vid_payload5.length,
+                vid_payload6.length);
+        System.arraycopy(vid_payload7, 0, allVidPayloads,
+                vid_payload1.length + vid_payload2.length + vid_payload3.length + vid_payload4.length + vid_payload5.length +
+                vid_payload6.length, vid_payload7.length);
+        System.arraycopy(vid_payload8, 0, allVidPayloads,
+                vid_payload1.length + vid_payload2.length + vid_payload3.length + vid_payload4.length + vid_payload5.length +
+                        vid_payload6.length + vid_payload7.length, vid_payload8.length);
+
+        return allVidPayloads;
+    }
+
+    private byte[] prepareVendorPayload(int num) {
+        byte[] nextPayload = null;
+        if (num < 8) {
+            nextPayload = Utils.toBytes(13, 1);
+        } else {
+            nextPayload = new byte[1];
+        }
+        byte[] reserved = new byte[1];
+        //byte[] payloadLengtgh = new byte[2];
+        byte[] VID_NAT_3947 = {(byte)0x4a, (byte)0x13, (byte)0x1c, (byte)0x81, (byte)0x07, (byte)0x03, (byte)0x58, (byte)0x45, (byte)0x5c, (byte)0x57, (byte)0x28, (byte)0xf2, (byte)0x0e, (byte)0x95, (byte)0x45, (byte)0x2f};
+        byte[] VID_IKE2 = {(byte)0xcd, (byte)0x60, (byte)0x46, (byte)0x43, (byte)0x35, (byte)0xdf, (byte)0x21, (byte)0xf8, (byte)0x7c, (byte)0xfd, (byte)0xb2, (byte)0xfc, (byte)0x68, (byte)0xb6, (byte)0xa4, (byte)0x48};
+        byte[] VID_IKE2b = {(byte)0x90, (byte)0xcb, (byte)0x80, (byte)0x91, (byte)0x3e, (byte)0xbb, (byte)0x69, (byte)0x6e, (byte)0x08, (byte)0x63, (byte)0x81, (byte)0xb5, (byte)0xec, (byte)0x42, (byte)0x7b, (byte)0x1f};
+        byte[] VID_IKE = {(byte)0x44, (byte)0x85, (byte)0x15, (byte)0x2d, (byte)0x18, (byte)0xb6, (byte)0xbb, (byte)0xcd, (byte)0x0b, (byte)0xe8, (byte)0xa8, (byte)0x46, (byte)0x95, (byte)0x79, (byte)0xdd, (byte)0xcc};
+        byte[] VID_XAUTH = {(byte)0x09, (byte)0x00, (byte)0x26, (byte)0x89, (byte)0xdf, (byte)0xd6, (byte)0xb7, (byte)0x12};
+        byte[] VID_CISCO_UNITY = {(byte)0x12, (byte)0xf5, (byte)0xf2, (byte)0x8c, (byte)0x45, (byte)0x71, (byte)0x68, (byte)0xa9, (byte)0x70, (byte)0x2d, (byte)0x9f, (byte)0xe2, (byte)0x74, (byte)0xcc, (byte)0x01, (byte)0x00};
+        byte[] VID_CISCO_FRAGMENT = {(byte)0x40, (byte)0x48, (byte)0xb7, (byte)0xd5, (byte)0x6e, (byte)0xbc, (byte)0xe8, (byte)0x85, (byte)0x25, (byte)0xe7, (byte)0xde, (byte)0x7f, (byte)0x00, (byte)0xd6, (byte)0xc2, (byte)0xd3, (byte)0x80, (byte)0x00, (byte)0x00, (byte)0x00};
+        byte[] VID_NAT_3706 = {(byte)0xaf, (byte)0xca, (byte)0xd7, (byte)0x13, (byte)0x68, (byte)0xa1, (byte)0xf1, (byte)0xc9, (byte)0x6b, (byte)0x86, (byte)0x96, (byte)0xfc, (byte)0x77, (byte)0x57, (byte)0x01, (byte)0x00};
+        byte[] data = null;
+        
+        switch (num) {
+            case 1:
+                data = VID_NAT_3947;
+                break;
+
+            case 2:
+                data = VID_IKE2;
+                break;
+
+            case 3:
+                data = VID_IKE2b;
+                break;
+
+            case 4:
+                data = VID_IKE;
+                break;
+
+            case 5:
+                data = VID_XAUTH;
+                break;
+
+            case 6:
+                data = VID_CISCO_UNITY;
+                break;
+
+            case 7:
+                data = VID_CISCO_FRAGMENT;
+                break;
+
+            case 8:
+                data = VID_NAT_3706;
+                break;
+
+            default:
+                break;
+
+        }
+
+        int len = nextPayload.length + reserved.length + 2/*payloadLengtgh*/ + data.length;
+        byte[] payloadLength = Utils.toBytes(len, 2);
+        byte[] payload = new byte[len];
+        
+        System.arraycopy(nextPayload, 0, payload, 0, nextPayload.length);
+        System.arraycopy(reserved, 0, payload, nextPayload.length, reserved.length);
+        System.arraycopy(payloadLength, 0, payload, nextPayload.length + reserved.length, payloadLength.length);
+        System.arraycopy(data, 0, payload,
+                nextPayload.length + reserved.length + payloadLength.length, data.length);
+
+        return payload;
     }
 
     private byte[] preparePhase1SecondMsg(byte[] header) {
