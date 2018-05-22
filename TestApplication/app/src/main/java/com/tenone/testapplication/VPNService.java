@@ -9,8 +9,6 @@ import android.os.ParcelFileDescriptor;
 import android.util.Log;
 import android.widget.Toast;
 
-
-import com.android.internal.app.AlertActivity;
 import com.tenone.testapplication.isakmp.IsakmpHeader;
 import com.tenone.testapplication.isakmp.KeyExchangeUtil;
 import com.tenone.testapplication.isakmp.PayloadAttribute;
@@ -141,7 +139,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             mKeyExchangeUtil.setPreSharedKey("test4stagwell");
             mKeyExchangeUtil.setHashAlgorithm("HmacSHA256");
             mKeyExchangeUtil.setEncryptAlgorithm("AES256");
-            Intent pendingIntent = new Intent(this, AlertActivity.class);
+            Intent pendingIntent = new Intent(this, MainActivity.class);
             configureIntent = PendingIntent.getActivity(this, REQUEST_CODE, pendingIntent, DEFAULT_INTENT_FLAG);
 
             // Start a new session by creating a new thread.
@@ -1261,9 +1259,13 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
 //        byte[] header = prepareHeader(4);
         byte[] keyExchangePayload = prepareKeyExchangePayload();
-        byte[] noncePayload = prepareNoncePayload(0, 1);
+        byte[] noncePayload = prepareNoncePayload(20, 1);
+        byte[] natPayload1 = prepareNatPayload(20, isakmpHeader.responderCookie,
+                mServerAddress, mServerPort);
+        byte[] natPayload2 = prepareNatPayload(0, isakmpHeader.responderCookie,
+                Utils.getIPAddress1(getApplicationContext()), "500");
 
-        int size = header.length + keyExchangePayload.length + noncePayload.length;
+        int size = header.length + keyExchangePayload.length + noncePayload.length + natPayload1.length + natPayload2.length;
 
         byte[] msgLength = Utils.toBytes(size, 4);
 
@@ -1272,6 +1274,10 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         System.arraycopy(msgLength, 0, msg, 24, 4);
         System.arraycopy(keyExchangePayload, 0, msg, 28, keyExchangePayload.length);
         System.arraycopy(noncePayload, 0, msg, 28 + keyExchangePayload.length, noncePayload.length);
+        System.arraycopy(natPayload1, 0, msg, 28 + keyExchangePayload.length + noncePayload.length,
+                natPayload1.length);
+        System.arraycopy(natPayload2, 0, msg, 28 + keyExchangePayload.length + noncePayload.length +
+                natPayload1.length, natPayload2.length);
 
         return msg;
     }
@@ -1308,6 +1314,37 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         //System.arraycopy(reserve, 0, payload, 1, 1);
         System.arraycopy(payloadLength, 0, payload, 2, 2);
         System.arraycopy(nonce, 0, payload, 4, nonce.length);
+
+        return payload;
+    }
+
+    private byte[] prepareNatPayload(int nextPayloadNumber, byte[] responderCookie, String ipAddress, String port) {
+        byte[] nextPayload = Utils.toBytes(nextPayloadNumber, 1);
+        byte[] reserved = new byte[1];
+        //byte[] payloadLength = new byte[2];
+        byte[] dataForHash = new byte[8 + 8 + 4 + 2];
+
+        String[] ipNumbers = ipAddress.split("\\.");
+        byte[] ipBytes = new byte[4];
+        for (int i = 0; i < 4; i++) {
+            ipBytes[i] = Utils.toBytes(Integer.valueOf(ipNumbers[i]), 1)[0];
+        }
+        byte[] portBytes = Utils.toBytes(Integer.valueOf(port), 2);
+
+        System.arraycopy(mInitiatorCookie, 0, dataForHash, 0, 8);
+        System.arraycopy(responderCookie, 0, dataForHash, 8, 8);
+        System.arraycopy(ipBytes, 0, dataForHash, 16, 4);
+        System.arraycopy(portBytes, 0, dataForHash, 20, 2);
+
+        byte[] hashData = KeyExchangeUtil.getInstance().hashDataWithoutKey(dataForHash);
+        int len = nextPayload.length + reserved.length + 2/*payloadLength*/ + hashData.length;
+        byte[] payloadLength = Utils.toBytes(len, 2);
+        byte[] payload = new byte[len];
+        System.arraycopy(nextPayload, 0, payload, 0, nextPayload.length);
+        System.arraycopy(reserved, 0, payload, nextPayload.length, reserved.length);
+        System.arraycopy(payloadLength, 0, payload, nextPayload.length + reserved.length, payloadLength.length);
+        System.arraycopy(hashData, 0, payload, nextPayload.length + reserved.length + payloadLength.length,
+                hashData.length);
 
         return payload;
     }

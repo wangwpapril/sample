@@ -382,11 +382,12 @@ public class KeyExchangeUtil {
             byte[] data = new byte[serverPublicKey.length + getPublicKey().length];
             System.arraycopy(getPublicKey(), 0, data, 0, getPublicKey().length);
             System.arraycopy(serverPublicKey, 0, data, getPublicKey().length, serverPublicKey.length);
-            MessageDigest messageDigest = MessageDigest.getInstance(getHashProvider());
-            messageDigest.update(data);
-            byte[] ivBytes = messageDigest.digest();
+
+            byte[] ivBytes = hashDataWithoutKey(data);
             mIv = new byte[16];
-            System.arraycopy(ivBytes, 0, mIv, 0, 16);
+            if (ivBytes != null) {
+                System.arraycopy(ivBytes, 0, mIv, 0, 16);
+            }
 
             byte[] output = encryptData(payloadData);
 
@@ -394,7 +395,7 @@ public class KeyExchangeUtil {
 
             return output;
 
-        } catch (NoSuchAlgorithmException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -471,6 +472,19 @@ public class KeyExchangeUtil {
         while (mSPI <= 4096 /*IPSEC_DOI_SPI_OUR_MIN*/) {
             mSPI = random.nextInt();
         }
+    }
+
+    public byte[] hashDataWithoutKey(byte[] data) {
+        byte[] output = null;
+        try {
+            MessageDigest messageDigest = MessageDigest.getInstance(getHashProvider());
+            messageDigest.update(data);
+            output = messageDigest.digest();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+
+        return output;
     }
 
     private byte[] hashDataWithKey(byte[] key, byte[] data) {
@@ -557,13 +571,9 @@ public class KeyExchangeUtil {
         System.arraycopy(mFirstPhaseIv, 0, data, 0, 16);
         System.arraycopy(messageId, 0, data, 16, messageId.length);
 
-        try {
-            MessageDigest messageDigest = MessageDigest.getInstance(getHashProvider());
-            messageDigest.update(data);
-            byte[] ivBytes = messageDigest.digest();
+        byte[] ivBytes = hashDataWithoutKey(data);
+        if (ivBytes != null) {
             System.arraycopy(ivBytes, 0, mIv, 0, 16);
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
         }
     }
 
