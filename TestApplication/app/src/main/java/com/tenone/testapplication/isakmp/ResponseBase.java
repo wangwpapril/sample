@@ -16,6 +16,14 @@ abstract public class ResponseBase {
 
 
     public ResponseBase(ByteBuffer buffer) {
+        this(buffer, false);
+    }
+
+    public ResponseBase(ByteBuffer buffer, boolean skipFirst4Bytes) {
+        if (skipFirst4Bytes) {
+            // remove the first 4 zero non-esp marker by moving the position. RFC3948
+            buffer.getInt();
+        }
         isakmpHeader = new IsakmpHeader(buffer);
         next = isakmpHeader.nextPayload;
     }

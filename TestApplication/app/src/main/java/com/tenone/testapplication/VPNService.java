@@ -220,6 +220,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             tunnel.connect(server);
             // Here we put the tunnel into non-blocking mode.
             tunnel.configureBlocking(false);
+
             // Authenticate and configure the virtual network interface.
             if (sharedSecret != null) {
                 doHandshake(tunnel);
@@ -261,7 +262,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 length = tunnel.read(packet);
                 if (length > 0) {
                     // Ignore control messages, which start with zero.
-                    if (packet.get(0) != 0) {
+                    byte firstByte = packet.get();
+                    if (firstByte != 0 && firstByte != 0xff) {
                         // Write the incoming packet to the output stream.
                         out.write(packet.array(), 0, length);
                     }
@@ -376,6 +378,21 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
         ByteBuffer packet = ByteBuffer.allocate(HANDSHAKE_BUFFER);
         for (int i = 1; i <= 10; i++) {
+            if (i == 3) {
+                try {
+                    InetSocketAddress socketAddress = new InetSocketAddress(mServerAddress, 4500);
+                    tunnel.disconnect();
+                    tunnel.connect(socketAddress);
+                    tunnel.configureBlocking(false);
+                    if (!protect(tunnel.socket())) {
+                        Log.e(TAG, "Failed to protect the socket");
+                        break;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    break;
+                }
+            }
             ResponseBase base = messageHandler(i, packet, tunnel);
             if (base == null) {
                 break;
@@ -435,6 +452,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 break;
             case 3:
                 packet.clear();
+
                 byte[] flag = Utils.toBytes(1, 1);
                 if (mKeyExchangeUtil.instantiateServerPublicKey(keyData)) {
                     mKeyExchangeUtil.generateExchangeInfo(nonceData, isakmpHeader.initiatorCookie, isakmpHeader.responderCookie);
@@ -447,7 +465,9 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     System.arraycopy(hashPayload, 0, combineData, idPayload.length, hashPayload.length);
 
                     byte[] encryptedData = mKeyExchangeUtil.prepare1stEncryptedPayload(combineData, keyData);
-                    packet.put(preparePhase1ThirdMsg(isakmpHeader.toData(5, encryptedData.length + 28, flag[0]), encryptedData)).flip();
+                    byte[] phase1ThirdMsg = preparePhase1ThirdMsg(isakmpHeader.toData(5, encryptedData.length + 28, flag[0]), encryptedData);
+
+                    packet.put(prependNonESPMarker(phase1ThirdMsg)).flip();
                     if (sendMessage(packet, tunnel)) {
                         byte[] Iv = new byte[16];
                         System.arraycopy(encryptedData, encryptedData.length - 16, Iv, 0, 16);
@@ -462,7 +482,6 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                                 break;
                             }
                         }
-
                     }
                 }
                 break;
@@ -477,7 +496,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
                         packet.clear();
                         byte[] payload = preparePhase2ConfigModeFirstMsg(isakmpHeader.toData(8), isakmpHeader.messageId);
-                        packet.put(payload).flip();
+                        packet.put(prependNonESPMarker(payload)).flip();
 
                         if (sendMessage(packet, tunnel)) {
                             break;
@@ -496,7 +515,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
                         packet.clear();
                         byte[] secondMsg = preparePhase2ConfigModeSecondMsg(isakmpHeader.toData(8), isakmpHeader.messageId);
-                        packet.put(secondMsg).flip();
+                        packet.put(prependNonESPMarker(secondMsg)).flip();
                         if (sendMessage(packet, tunnel)) {
                             byte[] Iv = new byte[16];
                             System.arraycopy(secondMsg, secondMsg.length - 16, Iv, 0, 16);
@@ -507,7 +526,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                             int messageId = random.nextInt();
                             KeyExchangeUtil.getInstance().preparePhase2IV(Utils.toBytes(messageId, 4));
                             byte[] thirdMsg = preparePhase2ConfigModeThirdMsg(isakmpHeader.toData(8, messageId), messageId);
-                            packet.put(thirdMsg).flip();
+                            packet.put(prependNonESPMarker(thirdMsg)).flip();
                             if (sendMessage(packet, tunnel)) {
                                 System.arraycopy(thirdMsg, thirdMsg.length - 16, Iv, 0, 16);
                                 KeyExchangeUtil.getInstance().setIV(Iv);
@@ -536,7 +555,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
                             byte[] firstMsgQuickMode = preparePhase2QuickModeFirstMsg(isakmpHeader.toData(8, messageId, 32),
                                     messageId, ipAddress, subnet);
-                            packet.put(firstMsgQuickMode).flip();
+                            packet.put(prependNonESPMarker(firstMsgQuickMode)).flip();
                             if (sendMessage(packet, tunnel)) {
                                 Log.d(TAG, "SENT FIRST MESSAGE IN QUICK MODE");
                                 byte[] Iv = new byte[16];
@@ -564,7 +583,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         byte[] responderNonce = ((PayloadNonce)response.payloadList.get(2)).nonceData;
                         byte[] lastMsg = preparePhase2QuickModeSecondMsg(isakmpHeader.toData(8),
                                 isakmpHeader.messageId, responderNonce);
-                        packet.put(lastMsg).flip();
+                        packet.put(prependNonESPMarker(lastMsg)).flip();
                         if (sendMessage(packet, tunnel)) {
                             Log.d(TAG, "Sent last message in quick mode");
                         }
@@ -649,12 +668,14 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         // Configure a builder while parsing the parameters.
         Builder builder = new Builder();
 
-        builder.setMtu(15000);
-        builder.addAddress(ia, 0);
+        builder.setMtu(1500);
+        //builder.addAddress("172.31.29.172", 0);
+        builder.addAddress("10.0.2.15", 32);
+        //builder.addAddress(Utils.getIPAddress1(getApplicationContext()), 24);
 //        builder.addAddress("10.10.68.200", 0);
-        builder.addRoute(ir, 0);
-//        builder.addRoute("0.0.0.0", 0);
-        builder.addDnsServer("8.8.4.4");
+//        builder.addRoute(ir, 0);
+        builder.addRoute("0.0.0.0", 0);
+        builder.addDnsServer("8.8.8.8");
 
         // Close the old interface since the parameters have been changed.
 //        try {
@@ -850,7 +871,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
      * Proposal payload. Currently has only one transform payload which uses AES_CBC for encryption, and SHA2-256 for hash
      * @return
      */
-    private byte[] prepareProposalPayload() {
+    private byte[] prepareProposalPayload1() {
         byte[] nextPayload = new byte[1];
         byte[] reserved = new byte[1];
         //byte[] payloadLength = new byte[2];
@@ -885,7 +906,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
      * Not using at this time. Propose 15 transforms that we support
      * @return
      */
-    private byte[] prepareProposalPayload2() {
+    private byte[] prepareProposalPayload() {
         byte[] nextPayload = new byte[1];
         byte[] reserved = new byte[1];
         //byte[] payloadLength = new byte[2];
@@ -978,12 +999,12 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
     private byte[] prepareTransformPayload(int i) {
         byte[] nextPayload = null;
-//        if (i < 15) {
-////            nextPayload = Utils.toBytes(3, 1);    // 3 - Transform payload
-////        } else {
-////            nextPayload = Utils.toBytes(0, 1);
-////        }
-        nextPayload = new byte[1];
+        if (i < 15) {
+            nextPayload = Utils.toBytes(3, 1);    // 3 - Transform payload
+        } else {
+            nextPayload = Utils.toBytes(0, 1);
+        }
+        //nextPayload = new byte[1];
         byte[] reserved = new byte[1];
         //byte[] payloadLength = new byte[2];
         byte[] transformNumber = Utils.toBytes(i, 1);
@@ -2106,5 +2127,13 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         System.arraycopy(hashData, 0, payload, nextPayload.length + reserved.length + payloadLength.length, hashData.length);
 
         return payload;
+    }
+
+    private byte[] prependNonESPMarker(byte[] msg) {
+        // prepend the non-esp marker which is 4 zero bytes when sending messages to 4500. RFC3947, RFC3948
+        byte[] msgWithPrependHeader = new byte[4 + msg.length];
+        System.arraycopy(msg, 0, msgWithPrependHeader, 4, msg.length);
+
+        return msgWithPrependHeader;
     }
 }

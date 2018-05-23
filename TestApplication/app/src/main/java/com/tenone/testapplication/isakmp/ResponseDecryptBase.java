@@ -16,13 +16,12 @@ public abstract class ResponseDecryptBase extends ResponseBase {
     protected int attributeSize;
 
     public ResponseDecryptBase(ByteBuffer buffer) {
-        super(buffer);
+        super(buffer, true);
         if (isDataValid() && prepareIV()) {
             decryptData(buffer);
 
             parseData(buffer);
         }
-
     }
 
     @Override
