@@ -15,18 +15,16 @@ import com.tenone.testapplication.isakmp.PayloadAttribute;
 import com.tenone.testapplication.isakmp.PayloadBase;
 import com.tenone.testapplication.isakmp.PayloadKeyEx;
 import com.tenone.testapplication.isakmp.PayloadNonce;
+import com.tenone.testapplication.isakmp.PayloadSA;
 import com.tenone.testapplication.isakmp.ResponseBase;
 import com.tenone.testapplication.isakmp.ResponseConfigModeFirst;
 import com.tenone.testapplication.isakmp.ResponseConfigModeSecond;
 import com.tenone.testapplication.isakmp.ResponseConfigModeThird;
-import com.tenone.testapplication.isakmp.ResponseDecryptBase;
 import com.tenone.testapplication.isakmp.ResponseMainModeFirst;
 import com.tenone.testapplication.isakmp.ResponseMainModeSecond;
 import com.tenone.testapplication.isakmp.ResponseMainModeThird;
 import com.tenone.testapplication.isakmp.ResponseQuickModeFirst;
 import com.tenone.testapplication.isakmp.Utils;
-
-import org.spongycastle.util.IPAddress;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -71,6 +69,9 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
     private ParcelFileDescriptor fileDescriptor;
     private String vpnParameters;
     private PendingIntent configureIntent;
+    private int mESPSequenceNumber;
+    private byte[] mInboundESPSPI;
+    private byte[] mOutbountESPSPI;
 
     private byte[] mSAPayload;
 
@@ -170,6 +171,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
     public synchronized void run() {
         try {
             Log.d(TAG, "Starting");
+            mESPSequenceNumber = 0;
+            mInboundESPSPI = KeyExchangeUtil.getInstance().generateESPSPI();
 
             // If anything needs to be obtained using the network, get it now.
             // This greatly reduces the complexity of seamless handover, which
@@ -229,6 +232,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             }
             // Now we are connected. Set the flag and show the message.
             connected = true;
+
 //            handler.sendEmptyMessage(R.string.VPN_connected);
             // Packets to be sent are queued in this input stream.
             FileInputStream in = new FileInputStream(fileDescriptor.getFileDescriptor());
@@ -236,6 +240,9 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             FileOutputStream out = new FileOutputStream(fileDescriptor.getFileDescriptor());
             // Allocate the buffer for a single packet.
             ByteBuffer packet = ByteBuffer.allocate(DEFAULT_PACKET_SIZE);
+
+            boolean isDataSend = true;
+
             // We use a timer to determine the status of the tunnel. It
             // works on both sides. A positive value means sending, and
             // any other means receiving. We start with receiving.
@@ -244,12 +251,29 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             while (true) {
                 // Assume that we did not make any progress in this iteration.
                 boolean idle = true;
+
                 // Read the outgoing packet from the input stream.
                 int length = in.read(packet.array());
                 if (length > 0) {
                     // Write the outgoing packet to the tunnel.
                     packet.limit(length);
-                    tunnel.write(packet);
+                    byte[] readBytes = new byte[length];
+                    System.arraycopy(packet.array(), 0, readBytes, 0, length);
+                    byte[] espPayload = prepareESPPayload(readBytes);
+                    //if (espPayload.length)
+//                    byte[] icvBytes = KeyExchangeUtil.getInstance().hashDataWithoutKey(espPayload);
+//                    byte[] msg = new byte[espPayload.length + icvBytes.length];
+//                    System.arraycopy(espPayload, 0, msg, 0, espPayload.length);
+//                    System.arraycopy(icvBytes, 0, msg, espPayload.length, icvBytes.length);
+//
+//                    ByteBuffer buf = ByteBuffer.allocate(espPayload.length + icvBytes.length);
+//                    buf.put(msg);
+                    ByteBuffer buf = ByteBuffer.allocate(espPayload.length);
+                    buf.put(espPayload);
+                    buf.position(0);
+                    tunnel.write(buf);
+                    buf.clear();
+                    //tunnel.write(packet);
                     packet.clear();
                     // There might be more outgoing packets.
                     idle = false;
@@ -262,10 +286,11 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 length = tunnel.read(packet);
                 if (length > 0) {
                     // Ignore control messages, which start with zero.
-                    byte firstByte = packet.get();
-                    if (firstByte != 0 && firstByte != 0xff) {
+                    byte firstByte = packet.get(0);
+                    if (firstByte != 0 && firstByte != (byte)0xff) {
                         // Write the incoming packet to the output stream.
                         out.write(packet.array(), 0, length);
+
                     }
                     packet.clear();
                     // There might be more incoming packets.
@@ -581,6 +606,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
                         packet.clear();
                         byte[] responderNonce = ((PayloadNonce)response.payloadList.get(2)).nonceData;
+                        mOutbountESPSPI = ((PayloadSA)response.payloadList.get(1)).payloadProposal.spiData;
+                        KeyExchangeUtil.getInstance().prepareKeyMaterial(responderNonce, mOutbountESPSPI);
                         byte[] lastMsg = preparePhase2QuickModeSecondMsg(isakmpHeader.toData(8),
                                 isakmpHeader.messageId, responderNonce);
                         packet.put(prependNonESPMarker(lastMsg)).flip();
@@ -669,12 +696,15 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         Builder builder = new Builder();
 
         builder.setMtu(1500);
-        //builder.addAddress("172.31.29.172", 0);
-        builder.addAddress("10.0.2.15", 32);
+
+        builder.addAddress(ia, 0);
         //builder.addAddress(Utils.getIPAddress1(getApplicationContext()), 24);
 //        builder.addAddress("10.10.68.200", 0);
 //        builder.addRoute(ir, 0);
+
         builder.addRoute("0.0.0.0", 0);
+        builder.addRoute(mServerAddress, 32);
+        //builder.addRoute("172.31.29.172", 32);
         builder.addDnsServer("8.8.8.8");
 
         // Close the old interface since the parameters have been changed.
@@ -2011,7 +2041,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         System.arraycopy(transformNumber, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
                 proposalNumber.length + protocolId.length + spiSize.length, transformNumber.length);
         System.arraycopy(spi, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
-                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length, spiSize.length);
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length, spi.length);
         System.arraycopy(transformPayload1, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
                 proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length, transformPayload1.length);
 
@@ -2135,5 +2165,55 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         System.arraycopy(msg, 0, msgWithPrependHeader, 4, msg.length);
 
         return msgWithPrependHeader;
+    }
+
+    private byte[] prepareESPPayload(byte[] inputData) {
+
+        byte[] newIv = genereate16RandomBytes();
+        KeyExchangeUtil.getInstance().setIV(newIv);
+
+        int len = inputData.length + 1/*padLength*/ + 1/*nextHeader*/;
+
+        int padLength = len % 16;
+        if (padLength != 0) {
+            padLength = 16 - padLength;
+            len += padLength;
+        }
+
+        byte[] padBytes = null;
+        if (padLength > 0) {
+            padBytes = new byte[padLength];
+            for (int i = 0; i < padLength; i++) {
+                padBytes[i] = (byte)(i + 1);
+            }
+        }
+        byte[] nextHeader = Utils.toBytes(4, 1);
+        byte[] dataForEncryption = new byte[len];
+        System.arraycopy(inputData, 0, dataForEncryption, 0, inputData.length);
+        if (padLength > 0) {
+            System.arraycopy(padBytes, 0, dataForEncryption, inputData.length, padLength);
+        }
+        System.arraycopy(Utils.toBytes(padLength, 1), 0, dataForEncryption,
+                inputData.length + padLength, 1);
+        System.arraycopy(nextHeader, 0, dataForEncryption,
+                inputData.length + padLength + 1, nextHeader.length);
+
+        byte[] encryptedData = KeyExchangeUtil.getInstance().encryptESPPayload(dataForEncryption);
+        len = mOutbountESPSPI.length + 4/*mESPSequenceNumber*/ + newIv.length + encryptedData.length;
+
+        byte[] payload = new byte[len];
+        System.arraycopy(mOutbountESPSPI, 0, payload, 0, mOutbountESPSPI.length);
+        System.arraycopy(Utils.toBytes(++mESPSequenceNumber), 0, payload, mOutbountESPSPI.length, 4);
+        System.arraycopy(newIv, 0, payload, mOutbountESPSPI.length + 4, newIv.length);
+        System.arraycopy(encryptedData, 0, payload, mOutbountESPSPI.length + 4 + newIv.length, encryptedData.length);
+
+        return payload;
+    }
+
+    private byte[] genereate16RandomBytes() {
+        byte[] bytes = new byte[16];
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(bytes);
+        return bytes;
     }
 }
