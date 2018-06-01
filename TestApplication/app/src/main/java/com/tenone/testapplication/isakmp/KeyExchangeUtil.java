@@ -2,6 +2,7 @@ package com.tenone.testapplication.isakmp;
 
 import android.util.Log;
 
+import org.spongycastle.crypto.BufferedBlockCipher;
 import org.spongycastle.crypto.InvalidCipherTextException;
 import org.spongycastle.crypto.engines.AESEngine;
 import org.spongycastle.crypto.modes.CBCBlockCipher;
@@ -126,7 +127,15 @@ public class KeyExchangeUtil {
 //            byte[] Nr_b2 = {(byte)0x21,(byte)0x1f,(byte)0xdb,(byte)0x66,(byte)0xcc,(byte)0x60,(byte)0x01,(byte)0xad,(byte)0x03,(byte)0x97,(byte)0xb9,(byte)0x38,(byte)0xed,(byte)0x6a,(byte)0xea,(byte)0xfb,(byte)0x3d,(byte)0x49,(byte)0xad,(byte)0xc1,(byte)0x9f,(byte)0x24,(byte)0x34,(byte)0xca,(byte)0x2b,(byte)0x47,(byte)0xb1,(byte)0xa5,(byte)0xb4,(byte)0x11,(byte)0x4b,(byte)0xf4};
 //            byte[] spi_r2 = {(byte)0xc9,(byte)0x2f,(byte)0x40,(byte)0x31};
 //
+//            byte[] tIV5 = {(byte)0xc8,(byte)0xb7,(byte)0x37,(byte)0x03,(byte)0xc5,(byte)0x8e,(byte)0x2f,(byte)0xbe,(byte)0x13,(byte)0xe6,(byte)0x9e,(byte)0x12,(byte)0xf1,(byte)0x23,(byte)0x1e,(byte)0x25};
+//            byte[] dataToDecrypt5 = {(byte)0x93,(byte)0x32,(byte)0x32,(byte)0xd0,(byte)0x56,(byte)0xb1,(byte)0xde,(byte)0x92,(byte)0xb3,(byte)0x7c,(byte)0x87,(byte)0x55,(byte)0x73,(byte)0xad,(byte)0xaa,(byte)0x9a,(byte)0x41,(byte)0x42,(byte)0x0b,(byte)0x12,(byte)0xc3,(byte)0xfe,(byte)0x0f,(byte)0x5c,(byte)0xa3,(byte)0xea,(byte)0x33,(byte)0xc8,(byte)0xb8,(byte)0xeb,(byte)0x1f,(byte)0x85,(byte)0xb8,(byte)0xb0,(byte)0x1f,(byte)0x30,(byte)0x1b,(byte)0x20,(byte)0x74,(byte)0x85,(byte)0xa3,(byte)0xa5,(byte)0xfa,(byte)0xa9,(byte)0xe3,(byte)0xa1,(byte)0xbd,(byte)0x08,(byte)0x4c,(byte)0x07,(byte)0xd8,(byte)0x75,(byte)0x96,(byte)0x50,(byte)0x88,(byte)0x1e,(byte)0x7c,(byte)0x07,(byte)0x81,(byte)0x06,(byte)0xeb,(byte)0x7f,(byte)0x34,(byte)0x10,(byte)0xe6,(byte)0xb0,(byte)0x6b,(byte)0x44,(byte)0x81,(byte)0x8f,(byte)0x5c,(byte)0x6b,(byte)0x4a,(byte)0x6f,(byte)0x9e,(byte)0x7e};
 //
+//            byte[] keymat5 = {(byte)0xbb,(byte)0x85,(byte)0x33,(byte)0xea,(byte)0x53,(byte)0xd2,(byte)0x70,(byte)0xe0,(byte)0xcf,(byte)0xa6,(byte)0x71,(byte)0xf5,(byte)0xa1,(byte)0x84,(byte)0xdb,(byte)0x64,(byte)0x4e,(byte)0xd9,(byte)0xd2,(byte)0x94,(byte)0x4b,(byte)0x24,(byte)0x26,(byte)0x0b,(byte)0xd6,(byte)0x59,(byte)0x8b,(byte)0x87,(byte)0x87,(byte)0xda,(byte)0x6d,(byte)0x76};
+//
+//            setIV(tIV5);
+//            byte[] out = aes256Decrypt(keymat5, dataToDecrypt5);
+//
+//            print("out", out);
 //
 //            byte[]dataForHash = new byte[1 + tResponderNonce.length + tInitiatorNonce.length + tSPI_r.length];
 //            //byte[]dataForHash = new byte[1 + tResponderNonce.length + tInitiatorNonce.length + tSPI_i.length];
@@ -657,7 +666,7 @@ public class KeyExchangeUtil {
     private byte[] aes256Encrypt2(byte[] key, byte[] inputData) {
 
         try {
-            PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+            BufferedBlockCipher cipher = new BufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
 
             cipher.init(true, new ParametersWithIV(new KeyParameter(key), mIv));
             byte[] outBuffer = new byte[cipher.getOutputSize(inputData.length)];
@@ -689,7 +698,15 @@ public class KeyExchangeUtil {
             byte[] outBuffer = new byte[cipher.getOutputSize(encryptedData.length)];
 
             int processed = cipher.processBytes(encryptedData, 0, encryptedData.length, outBuffer, 0);
-            processed += cipher.doFinal(outBuffer, processed);
+
+            if (encryptedData.length - processed >= 16) {
+                processed += cipher.doFinal(outBuffer, processed);
+            } else {
+                byte[] removedPaddingBytes = new byte[processed];
+                System.arraycopy(outBuffer, 0, removedPaddingBytes, 0, processed);
+
+                return removedPaddingBytes;
+            }
 
 //            System.arraycopy(encryptedData, encryptedData.length - 16, mIv, 0, 16);
 

@@ -35,10 +35,14 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
+import java.security.Key;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Random;
+
+import static android.system.OsConstants.AF_INET;
+import static android.system.OsConstants.AF_INET6;
 
 
 public class VPNService extends VpnService implements Handler.Callback, Runnable{
@@ -259,21 +263,29 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     packet.limit(length);
                     byte[] readBytes = new byte[length];
                     System.arraycopy(packet.array(), 0, readBytes, 0, length);
+//                    byte[] b2 = new byte[length - 28];
+//                    System.arraycopy(readBytes, 28, b2, 0, length - 28);
+
+                    KeyExchangeUtil.getInstance().print("**** Payload before adding esp header and encryption", readBytes);
+                    //KeyExchangeUtil.getInstance().print("Removed header", b2);
+
                     byte[] espPayload = prepareESPPayload(readBytes);
-                    //if (espPayload.length)
-//                    byte[] icvBytes = KeyExchangeUtil.getInstance().hashDataWithoutKey(espPayload);
-//                    byte[] msg = new byte[espPayload.length + icvBytes.length];
-//                    System.arraycopy(espPayload, 0, msg, 0, espPayload.length);
-//                    System.arraycopy(icvBytes, 0, msg, espPayload.length, icvBytes.length);
-//
-//                    ByteBuffer buf = ByteBuffer.allocate(espPayload.length + icvBytes.length);
-//                    buf.put(msg);
+
                     ByteBuffer buf = ByteBuffer.allocate(espPayload.length);
                     buf.put(espPayload);
                     buf.position(0);
                     tunnel.write(buf);
                     buf.clear();
-                    //tunnel.write(packet);
+
+
+//                    ByteBuffer buf = ByteBuffer.allocate(readBytes.length);
+//                    buf.put(readBytes);
+//                    buf.position(0);
+//                    tunnel.write(buf);
+//                    buf.clear();
+
+//                    packet.position(0);
+//                    tunnel.write(packet);
                     packet.clear();
                     // There might be more outgoing packets.
                     idle = false;
@@ -694,6 +706,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
         // Configure a builder while parsing the parameters.
         Builder builder = new Builder();
+//        builder.allowFamily(AF_INET);
+//        builder.allowFamily(AF_INET6);
 
         builder.setMtu(1500);
 
@@ -703,7 +717,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 //        builder.addRoute(ir, 0);
 
         builder.addRoute("0.0.0.0", 0);
-        builder.addRoute(mServerAddress, 32);
+        //builder.addRoute(mServerAddress, 32);
         //builder.addRoute("172.31.29.172", 32);
         builder.addDnsServer("8.8.8.8");
 
@@ -2198,6 +2212,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         System.arraycopy(nextHeader, 0, dataForEncryption,
                 inputData.length + padLength + 1, nextHeader.length);
 
+        KeyExchangeUtil.getInstance().print("ESP payload before adding header and encrypted. PadLength: " + padLength, dataForEncryption);
+
         byte[] encryptedData = KeyExchangeUtil.getInstance().encryptESPPayload(dataForEncryption);
         len = mOutbountESPSPI.length + 4/*mESPSequenceNumber*/ + newIv.length + encryptedData.length;
 
@@ -2207,7 +2223,15 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         System.arraycopy(newIv, 0, payload, mOutbountESPSPI.length + 4, newIv.length);
         System.arraycopy(encryptedData, 0, payload, mOutbountESPSPI.length + 4 + newIv.length, encryptedData.length);
 
-        return payload;
+        byte[] fullICVBytes = KeyExchangeUtil.getInstance().hashDataWithoutKey(payload);
+        byte[] payloadWithICV = new byte[payload.length + 12];
+        System.arraycopy(payload, 0, payloadWithICV, 0, payload.length);
+        // only copy the first 12 bytes
+        System.arraycopy(fullICVBytes, 0, payloadWithICV, payload.length, 12);
+
+        KeyExchangeUtil.getInstance().print("****** ESP Payload", payloadWithICV);
+
+        return payloadWithICV;
     }
 
     private byte[] genereate16RandomBytes() {
