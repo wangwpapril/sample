@@ -267,7 +267,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 //                    byte[] b2 = new byte[length - 28];
 //                    System.arraycopy(readBytes, 28, b2, 0, length - 28);
 
-                    KeyExchangeUtil.getInstance().print("**** Payload before adding esp header and encryption", readBytes);
+                    //KeyExchangeUtil.getInstance().print("**** Payload before adding esp header and encryption", readBytes);
                     //KeyExchangeUtil.getInstance().print("Removed header", b2);
 
                     byte[] espPayload = prepareESPPayload(readBytes);
@@ -310,6 +310,10 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
 //                        out.write(packet.array(), 0, length);
                         out.write(espPayload.payload, 0, espPayload.payload.length);
+//                        byte[] incomingPacket = new byte[length];
+//                        System.arraycopy(packet.array(), 0, incomingPacket, 0, length);
+//
+//                        KeyExchangeUtil.getInstance().print("**** incoming packet", incomingPacket);
 
                     }
                     packet.clear();
@@ -719,13 +723,15 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
         builder.setMtu(1500);
 
+        builder.setBlocking(false);
         builder.addAddress(ia, 0);
-        //builder.addAddress(Utils.getIPAddress1(getApplicationContext()), 24);
+//        builder.addAddress(Utils.getIPAddress1(getApplicationContext()), 0);
 //        builder.addAddress("10.10.68.200", 0);
 //        builder.addRoute(ir, 0);
 
         builder.addRoute("0.0.0.0", 0);
-        //builder.addRoute(mServerAddress, 32);
+
+        builder.addRoute(mServerAddress, 32);
         //builder.addRoute("172.31.29.172", 32);
         builder.addDnsServer("8.8.8.8");
 
@@ -2038,14 +2044,27 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         byte[] proposalNumber = Utils.toBytes(1, 1);
         byte[] protocolId = Utils.toBytes(3, 1);        // PROTO_IPSEC_ESP
         byte[] spiSize = Utils.toBytes(4, 1);
-        byte[] transformNumber = Utils.toBytes(1, 1);
+        byte[] transformNumber = Utils.toBytes(12, 1);
         byte[] spi = Utils.toBytes(KeyExchangeUtil.getInstance().getSPI());
 
-        byte[] transformPayload1 = preparePhase2TransformPayload(1);
-
+        byte[] transformPayload1 = preparePhase2TransformPayload(1, 3, 12);
+        byte[] transformPayload2 = preparePhase2TransformPayload(2, 3, 12);
+        byte[] transformPayload3 = preparePhase2TransformPayload(3, 3, 12);
+        byte[] transformPayload4 = preparePhase2TransformPayload(4, 3, 12);
+        byte[] transformPayload5 = preparePhase2TransformPayload(5, 3, 12);
+        byte[] transformPayload6 = preparePhase2TransformPayload(6, 3, 12);
+        byte[] transformPayload7 = preparePhase2TransformPayload(7, 3, 3);
+        byte[] transformPayload8 = preparePhase2TransformPayload(8, 3, 3);
+        byte[] transformPayload9 = preparePhase2TransformPayload(9, 3, 3);
+        byte[] transformPayload10 = preparePhase2TransformPayload(10, 3, 2);
+        byte[] transformPayload11 = preparePhase2TransformPayload(11, 3, 2);
+        byte[] transformPayload12 = preparePhase2TransformPayload(12, 0, 2);
 
         int size = nextPayload.length + reserved.length + 2/*payloadLength.length*/ + proposalNumber.length +
-                protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length;
+                protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length +
+                transformPayload2.length + transformPayload3.length + transformPayload4.length + transformPayload5.length +
+                transformPayload6.length + transformPayload7.length + transformPayload8.length + transformPayload9.length +
+                transformPayload10.length + transformPayload11.length + transformPayload12.length;
 
         byte[] payloadLength = Utils.toBytes(size, 2);
 
@@ -2066,19 +2085,59 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length, spi.length);
         System.arraycopy(transformPayload1, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
                 proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length, transformPayload1.length);
+        System.arraycopy(transformPayload2, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length,
+                transformPayload2.length);
+        System.arraycopy(transformPayload3, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length +
+                transformPayload2.length, transformPayload3.length);
+        System.arraycopy(transformPayload4, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length +
+                transformPayload2.length + transformPayload3.length, transformPayload4.length);
+        System.arraycopy(transformPayload5, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length +
+                transformPayload2.length + transformPayload3.length + transformPayload4.length, transformPayload5.length);
+        System.arraycopy(transformPayload6, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length +
+                transformPayload2.length + transformPayload3.length + transformPayload4.length + transformPayload5.length, transformPayload6.length);
+        System.arraycopy(transformPayload7, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length +
+                transformPayload2.length + transformPayload3.length + transformPayload4.length + transformPayload5.length + transformPayload6.length,
+                transformPayload7.length);
+        System.arraycopy(transformPayload8, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length +
+                transformPayload2.length + transformPayload3.length + transformPayload4.length + transformPayload5.length + transformPayload6.length +
+                transformPayload7.length, transformPayload8.length);
+        System.arraycopy(transformPayload9, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length +
+                transformPayload2.length + transformPayload3.length + transformPayload4.length + transformPayload5.length + transformPayload6.length +
+                transformPayload7.length + transformPayload8.length, transformPayload9.length);
+        System.arraycopy(transformPayload10, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length +
+                transformPayload2.length + transformPayload3.length + transformPayload4.length + transformPayload5.length + transformPayload6.length +
+                transformPayload7.length + transformPayload8.length + transformPayload9.length, transformPayload10.length);
+        System.arraycopy(transformPayload11, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length +
+                transformPayload2.length + transformPayload3.length + transformPayload4.length + transformPayload5.length + transformPayload6.length +
+                transformPayload7.length + transformPayload8.length + transformPayload9.length + transformPayload10.length, transformPayload11.length);
+        System.arraycopy(transformPayload12, 0, proposalPayload, nextPayload.length + reserved.length + payloadLength.length +
+                proposalNumber.length + protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length +
+                transformPayload2.length + transformPayload3.length + transformPayload4.length + transformPayload5.length + transformPayload6.length +
+                transformPayload7.length + transformPayload8.length + transformPayload9.length + transformPayload10.length + transformPayload11.length,
+                transformPayload12.length);
 
         return proposalPayload;
     }
 
-    private byte[] preparePhase2TransformPayload(int transformNumber) {
-        byte[] nextPayload = new byte[1];
+    private byte[] preparePhase2TransformPayload(int transformNumber, int nextPayloadNum, int transID) {
+        byte[] nextPayload = Utils.toBytes(nextPayloadNum, 1);
         byte[] reserved = new byte[1];
         //byte[] payloadLength = new byte[2];
-        byte[] transformNum = Utils.toBytes(1, 1);
-        byte[] transformID = Utils.toBytes(12, 1);
+        byte[] transformNum = Utils.toBytes(transformNumber, 1);
+        byte[] transformID = Utils.toBytes(transID, 1);
         byte[] reserved2 = new byte[2];
 
-        byte[] attributes = prepareDOIAttribute1(1);
+        byte[] attributes = prepareDOIAttribute1(transformNumber);
 
         int length = nextPayload.length + reserved.length + 2/*payloadLength*/ + transformNum.length
                 + transformID.length + reserved2.length + attributes.length;
@@ -2101,15 +2160,109 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
     }
 
     private byte[] prepareDOIAttribute1(int transformNumber) {
-        byte[] attributes = new byte[20];
+        byte[] attributes = null;
 
         switch (transformNumber) {
         case 1:
+            attributes = new byte[20];
             System.arraycopy(prepareDOIAttribute2(1, 1), 0, attributes, 0, 4);
             System.arraycopy(prepareDOIAttribute2(2, 28800), 0, attributes, 4, 4);
             System.arraycopy(prepareDOIAttribute2(4, 3), 0, attributes, 8, 4);
             System.arraycopy(prepareDOIAttribute2(5, 5), 0, attributes, 12, 4);
             System.arraycopy(prepareDOIAttribute2(6, 256), 0, attributes, 16, 4);
+            break;
+
+        case 2:
+            attributes = new byte[20];
+            System.arraycopy(prepareDOIAttribute2(1, 1), 0, attributes, 0, 4);
+            System.arraycopy(prepareDOIAttribute2(2, 28800), 0, attributes, 4, 4);
+            System.arraycopy(prepareDOIAttribute2(4, 3), 0, attributes, 8, 4);
+            System.arraycopy(prepareDOIAttribute2(5, 2), 0, attributes, 12, 4);
+            System.arraycopy(prepareDOIAttribute2(6, 256), 0, attributes, 16, 4);
+            break;
+
+        case 3:
+            attributes = new byte[20];
+            System.arraycopy(prepareDOIAttribute2(1, 1), 0, attributes, 0, 4);
+            System.arraycopy(prepareDOIAttribute2(2, 28800), 0, attributes, 4, 4);
+            System.arraycopy(prepareDOIAttribute2(4, 3), 0, attributes, 8, 4);
+            System.arraycopy(prepareDOIAttribute2(5, 1), 0, attributes, 12, 4);
+            System.arraycopy(prepareDOIAttribute2(6, 256), 0, attributes, 16, 4);
+            break;
+
+        case 4:
+            attributes = new byte[20];
+            System.arraycopy(prepareDOIAttribute2(1, 1), 0, attributes, 0, 4);
+            System.arraycopy(prepareDOIAttribute2(2, 28800), 0, attributes, 4, 4);
+            System.arraycopy(prepareDOIAttribute2(4, 3), 0, attributes, 8, 4);
+            System.arraycopy(prepareDOIAttribute2(5, 5), 0, attributes, 12, 4);
+            System.arraycopy(prepareDOIAttribute2(6, 128), 0, attributes, 16, 4);
+                break;
+
+        case 5:
+            attributes = new byte[20];
+            System.arraycopy(prepareDOIAttribute2(1, 1), 0, attributes, 0, 4);
+            System.arraycopy(prepareDOIAttribute2(2, 28800), 0, attributes, 4, 4);
+            System.arraycopy(prepareDOIAttribute2(4, 3), 0, attributes, 8, 4);
+            System.arraycopy(prepareDOIAttribute2(5, 2), 0, attributes, 12, 4);
+            System.arraycopy(prepareDOIAttribute2(6, 128), 0, attributes, 16, 4);
+            break;
+
+        case 6:
+            attributes = new byte[20];
+            System.arraycopy(prepareDOIAttribute2(1, 1), 0, attributes, 0, 4);
+            System.arraycopy(prepareDOIAttribute2(2, 28800), 0, attributes, 4, 4);
+            System.arraycopy(prepareDOIAttribute2(4, 3), 0, attributes, 8, 4);
+            System.arraycopy(prepareDOIAttribute2(5, 1), 0, attributes, 12, 4);
+            System.arraycopy(prepareDOIAttribute2(6, 128), 0, attributes, 16, 4);
+            break;
+
+        case 7:
+            attributes = new byte[16];
+            System.arraycopy(prepareDOIAttribute2(1, 1), 0, attributes, 0, 4);
+            System.arraycopy(prepareDOIAttribute2(2, 28800), 0, attributes, 4, 4);
+            System.arraycopy(prepareDOIAttribute2(4, 3), 0, attributes, 8, 4);
+            System.arraycopy(prepareDOIAttribute2(5, 5), 0, attributes, 12, 4);
+            break;
+
+        case 8:
+            attributes = new byte[16];
+            System.arraycopy(prepareDOIAttribute2(1, 1), 0, attributes, 0, 4);
+            System.arraycopy(prepareDOIAttribute2(2, 28800), 0, attributes, 4, 4);
+            System.arraycopy(prepareDOIAttribute2(4, 3), 0, attributes, 8, 4);
+            System.arraycopy(prepareDOIAttribute2(5, 2), 0, attributes, 12, 4);
+            break;
+
+        case 9:
+            attributes = new byte[16];
+            System.arraycopy(prepareDOIAttribute2(1, 1), 0, attributes, 0, 4);
+            System.arraycopy(prepareDOIAttribute2(2, 28800), 0, attributes, 4, 4);
+            System.arraycopy(prepareDOIAttribute2(4, 3), 0, attributes, 8, 4);
+            System.arraycopy(prepareDOIAttribute2(5, 1), 0, attributes, 12, 4);
+            break;
+
+        case 10:
+            attributes = new byte[16];
+            System.arraycopy(prepareDOIAttribute2(1, 1), 0, attributes, 0, 4);
+            System.arraycopy(prepareDOIAttribute2(2, 28800), 0, attributes, 4, 4);
+            System.arraycopy(prepareDOIAttribute2(4, 3), 0, attributes, 8, 4);
+            System.arraycopy(prepareDOIAttribute2(5, 5), 0, attributes, 12, 4);
+            break;
+
+        case 11:
+            attributes = new byte[16];
+            System.arraycopy(prepareDOIAttribute2(1, 1), 0, attributes, 0, 4);
+            System.arraycopy(prepareDOIAttribute2(2, 28800), 0, attributes, 4, 4);
+            System.arraycopy(prepareDOIAttribute2(4, 3), 0, attributes, 8, 4);
+            System.arraycopy(prepareDOIAttribute2(5, 2), 0, attributes, 12, 4);
+            break;
+
+        case 12:
+            attributes = new byte[16];
+            System.arraycopy(prepareDOIAttribute2(1, 1), 0, attributes, 0, 4);
+            System.arraycopy(prepareDOIAttribute2(2, 28800), 0, attributes, 4, 4);
+            System.arraycopy(prepareDOIAttribute2(4, 3), 0, attributes, 8, 4);
+            System.arraycopy(prepareDOIAttribute2(5, 1), 0, attributes, 12, 4);
             break;
 
         default:
@@ -2220,7 +2373,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         System.arraycopy(nextHeader, 0, dataForEncryption,
                 inputData.length + padLength + 1, nextHeader.length);
 
-        KeyExchangeUtil.getInstance().print("ESP payload before adding header and encrypted. PadLength: " + padLength, dataForEncryption);
+//        KeyExchangeUtil.getInstance().print("ESP payload before adding header and encrypted. PadLength: " + padLength, dataForEncryption);
 
         byte[] encryptedData = KeyExchangeUtil.getInstance().encryptESPPayload(dataForEncryption);
         len = mOutbountESPSPI.length + 4/*mESPSequenceNumber*/ + newIv.length + encryptedData.length;

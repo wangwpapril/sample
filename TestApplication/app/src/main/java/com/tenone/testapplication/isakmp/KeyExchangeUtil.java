@@ -157,10 +157,34 @@ public class KeyExchangeUtil {
 //            byte[] keymat2 = hashDataWithKey(tSkeyId_d2,dataForHash2);
 //
 //            setIV(tIV4);
-//
 //            byte[] output = aes256Decrypt(keymat2, dataToDecrypt4);
 //
+//            byte[] d5 = {(byte)0x42,(byte)0x6E,(byte)0x4B,(byte)0xA1,(byte)0xC5,(byte)0x0F,(byte)0x48,(byte)0xA9,(byte)0x91,(byte)0xAA,(byte)0xBE,(byte)0x65,(byte)0xFC,(byte)0xBB,(byte)0xA8,(byte)0xAA,(byte)0xD4,(byte)0x8C,(byte)0x47,(byte)0xB5,(byte)0x33,(byte)0x31,(byte)0xEB,(byte)0x4A,(byte)0x8B,(byte)0x17,(byte)0xEA,(byte)0x4D,(byte)0x5E,(byte)0x95,(byte)0xF8,(byte)0xA9,(byte)0x5D,(byte)0x6F,(byte)0x12,(byte)0xE3,(byte)0x52,(byte)0x60,(byte)0x30,(byte)0x9E,(byte)0x28,(byte)0x06,(byte)0x78,(byte)0x7C,(byte)0x25,(byte)0xA1,(byte)0x4E,(byte)0x1C,(byte)0xE8,(byte)0x4B,(byte)0x8C,(byte)0x0,(byte)0xBE,(byte)0x10,(byte)0x91,(byte)0x39,(byte)0x36,(byte)0x0,(byte)0xDB,(byte)0x0B,(byte)0xF1,(byte)0x0E,(byte)0xD3,(byte)0xBF,(byte)0xF9,(byte)0xEE,(byte)0x1B,(byte)0x7B,(byte)0xFA,(byte)0x3D,(byte)0xAB,(byte)0xEC,(byte)0x75,(byte)0xAA,(byte)0x56,(byte)0x08,(byte)0x4B,(byte)0xFD,(byte)0x5B,(byte)0x4A,(byte)0x65,(byte)0xAF,(byte)0x95,(byte)0x93,(byte)0x05,(byte)0x37,(byte)0xFF,(byte)0x93,(byte)0xA7,(byte)0x8E,(byte)0x02,(byte)0x99,(byte)0x5A,(byte)0xE1,(byte)0xD3,(byte)0x7B};
+//            byte[] hash5 = {(byte)0x39,(byte)0x92,(byte)0xB2,(byte)0xCE,(byte)0x5A,(byte)0x14,(byte)0x78,(byte)0xF4,(byte)0xC1,(byte)0x1,(byte)0xE0,(byte)0x4A};
+//            byte[] iv5 = {(byte)0xD4,(byte)0xC2,(byte)0xEF,(byte)0x84,(byte)0x7B,(byte)0x28,(byte)0x7A,(byte)0x44,(byte)0x33,(byte)0xC5,(byte)0xED,(byte)0xB1,(byte)0x55,(byte)0x2A,(byte)0xDD,(byte)0x88};
+//            byte[] eh5 = {(byte)0x1D,(byte)0xB7,(byte)0xEE,(byte)0xBE,(byte)0x00,(byte)0x00,(byte)0x00,(byte)0x1};
+//            byte[] k5 = {(byte)0x76,(byte)0xab,(byte)0x5a,(byte)0xbd,(byte)0x3e,(byte)0xca,(byte)0xf2,(byte)0x8c,(byte)0x8a,(byte)0x74,(byte)0xbb,(byte)0xed,(byte)0xfc,(byte)0x18,(byte)0x8d,(byte)0xe3,(byte)0x32,(byte)0xf4,(byte)0x19,(byte)0x7c,(byte)0x65,(byte)0x1a,(byte)0x36,(byte)0x49,(byte)0x02,(byte)0x8d,(byte)0xdc,(byte)0xa2,(byte)0x17,(byte)0xd1,(byte)0x31,(byte)0xf1};
+//
+//            setIV(iv5);
+//
+//            output = aes256Decrypt(k5, d5);
+//
 //            print("output", output);
+//
+//            byte[] temp = new byte[d5.length + iv5.length + eh5.length];
+//            System.arraycopy(eh5, 0, temp, 0, eh5.length);
+//            System.arraycopy(iv5, 0, temp, eh5.length, iv5.length);
+//            System.arraycopy(d5, 0, temp, eh5.length + iv5.length, d5.length);
+//
+//            output = hashDataWithoutKey(temp);
+//
+//            for (int i = 0; i < hash5.length; i++) {
+//                if (output[i] != hash5[i]) {
+//                    Log.i(TAG, "hash not matches");
+//                }
+//            }
+//
+//            Log.i(TAG, "Finish hash comparison");
 //
 //        } catch (Exception e) {
 //            e.printStackTrace();
@@ -230,7 +254,7 @@ public class KeyExchangeUtil {
             mKeyAgree.doPhase(serverPublicKey, true);
 
             mSharedSecret = mKeyAgree.generateSecret();
-            print("SharedSecret", mSharedSecret);
+            //print("SharedSecret", mSharedSecret);
 
             return true;
 
@@ -287,9 +311,9 @@ public class KeyExchangeUtil {
         try {
             mSKEYID = hashDataWithKey(mPreSharedSecret.getBytes("UTF-8"), inputData);
 
-            print("Nonce (initiator)", initiatorNonceBytes);
-            print("Nonce (responder)", responderNonce);
-            print("SKEYID: ", mSKEYID);
+//            print("Nonce (initiator)", initiatorNonceBytes);
+//            print("Nonce (responder)", responderNonce);
+//            print("SKEYID: ", mSKEYID);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -316,9 +340,9 @@ public class KeyExchangeUtil {
         //System.arraycopy(Utils.toBytes(0, 1), 0, inputData, mSharedSecret.length + initiatorCookie.length + responderCookie.length, 1);
         mSKEYIDd = hashDataWithKey(mSKEYID, inputData);
 
-        print("Initiator cookie", initiatorCookie);
-        print("responder cookie", responderCookie);
-        print("SKEYID_d", mSKEYIDd);
+//        print("Initiator cookie", initiatorCookie);
+//        print("responder cookie", responderCookie);
+//        print("SKEYID_d", mSKEYIDd);
 
     }
 
@@ -345,7 +369,7 @@ public class KeyExchangeUtil {
 
         mSKEYIDa = hashDataWithKey(mSKEYID, inputData);
 
-        print("SKEYID_a", mSKEYIDa);
+//        print("SKEYID_a", mSKEYIDa);
     }
 
     /**
@@ -371,7 +395,7 @@ public class KeyExchangeUtil {
 
         mSKEYIDe = hashDataWithKey(mSKEYID, inputData);
 
-        print("SKEYID_e", mSKEYIDe);
+//        print("SKEYID_e", mSKEYIDe);
 
     }
 
@@ -440,7 +464,7 @@ public class KeyExchangeUtil {
 
         byte[] hashData = hashDataWithKey(mSKEYID, data);
 
-        print("HashData", hashData);
+//        print("HashData", hashData);
 
         return hashData;
     }
@@ -469,8 +493,8 @@ public class KeyExchangeUtil {
 
         byte[] hashData = hashDataWithKey(mSKEYID, data);
 
-        print("Responder's 1st responderIDPayload", responderIDPayload);
-        print("Responder's 1st HashData", hashData);
+//        print("Responder's 1st responderIDPayload", responderIDPayload);
+//        print("Responder's 1st HashData", hashData);
 
         return hashData;
     }
@@ -490,7 +514,7 @@ public class KeyExchangeUtil {
 
             byte[] output = encryptData(payloadData);
 
-            print("Encrypted data", output);
+//            print("Encrypted data", output);
 
             return output;
 
@@ -518,7 +542,7 @@ public class KeyExchangeUtil {
     public byte[] hashConfigModePayload(byte[] data) {
         byte[] output = hashDataWithKey(mSKEYIDa, data);
 
-        print("Hash data for config mode payload", output);
+//        print("Hash data for config mode payload", output);
 
         return output;
     }
@@ -539,13 +563,13 @@ public class KeyExchangeUtil {
     public byte[] encryptDataWithKey(byte[] key, byte[] payloadData) {
 
         byte[] output = null;
-        print("IV", mIv);
+//        print("IV", mIv);
 
         if (mEncryptAlgorithm.equals("AES256")) {
             output = aes256Encrypt(key, payloadData);
 
-            print("Encrypted data", output);
-            print("payload before encrypt", payloadData);
+//            print("Encrypted data", output);
+//            print("payload before encrypt", payloadData);
         }
 
         return output;
@@ -692,8 +716,8 @@ public class KeyExchangeUtil {
     private byte[] aes256Decrypt(byte[] key, byte[] encryptedData) {
         try{
 
-            print("data before decrypt", encryptedData);
-            print("mIv before decrypt", mIv);
+//            print("data before decrypt", encryptedData);
+//            print("mIv before decrypt", mIv);
 
 
             PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()), new ZeroBytePadding());
@@ -714,7 +738,7 @@ public class KeyExchangeUtil {
 
 //            System.arraycopy(encryptedData, encryptedData.length - 16, mIv, 0, 16);
 
-            print("data after decrypt", outBuffer);
+//            print("data after decrypt", outBuffer);
 //            print("mIv after decrypt", mIv);
 
             return outBuffer;
@@ -784,7 +808,7 @@ public class KeyExchangeUtil {
     public void setIV(byte[] iv) {
         if (iv != null && iv.length == 16)
             this.mIv = iv;
-        print("SetIv=", iv);
+        //print("SetIv=", iv);
     }
 
     private String getHashProvider() {
