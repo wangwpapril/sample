@@ -9,6 +9,7 @@ import android.os.ParcelFileDescriptor;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.tenone.testapplication.isakmp.ESPPayload;
 import com.tenone.testapplication.isakmp.IsakmpHeader;
 import com.tenone.testapplication.isakmp.KeyExchangeUtil;
 import com.tenone.testapplication.isakmp.PayloadAttribute;
@@ -295,13 +296,20 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     }
                 }
                 // Read the incoming packet from the tunnel.
+                packet.clear();
                 length = tunnel.read(packet);
                 if (length > 0) {
                     // Ignore control messages, which start with zero.
+                    packet.position(0);
                     byte firstByte = packet.get(0);
                     if (firstByte != 0 && firstByte != (byte)0xff) {
                         // Write the incoming packet to the output stream.
-                        out.write(packet.array(), 0, length);
+                        packet.position(0);
+                        packet.limit(length);
+                        ESPPayload espPayload = new ESPPayload(packet);
+
+//                        out.write(packet.array(), 0, length);
+                        out.write(espPayload.payload, 0, espPayload.payload.length);
 
                     }
                     packet.clear();

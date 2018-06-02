@@ -527,6 +527,10 @@ public class KeyExchangeUtil {
         return aes256Encrypt2(mOutboundKeyMaterial, payload);
     }
 
+    public byte[] decryptESPPayload(byte[] payload) {
+        return aes256Decrypt2(mInboundKeyMaterial, payload);
+    }
+
     public byte[] encryptData(byte[] payloadData) {
 
         return encryptDataWithKey(mSKEYIDe, payloadData);
@@ -712,6 +716,40 @@ public class KeyExchangeUtil {
 
             print("data after decrypt", outBuffer);
 //            print("mIv after decrypt", mIv);
+
+            return outBuffer;
+
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    private byte[] aes256Decrypt2(byte[] key, byte[] encryptedData) {
+        try{
+
+            print("data before decrypt", encryptedData);
+            print("mIv before decrypt", mIv);
+
+
+            BufferedBlockCipher cipher = new BufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+
+            cipher.init(false, new ParametersWithIV(new KeyParameter(key), mIv));
+            byte[] outBuffer = new byte[cipher.getOutputSize(encryptedData.length)];
+
+            int processed = cipher.processBytes(encryptedData, 0, encryptedData.length, outBuffer, 0);
+
+            if (encryptedData.length - processed >= 16) {
+                processed += cipher.doFinal(outBuffer, processed);
+            } else {
+                byte[] removedPaddingBytes = new byte[processed];
+                System.arraycopy(outBuffer, 0, removedPaddingBytes, 0, processed);
+
+                return removedPaddingBytes;
+            }
+
+            print("data after decrypt", outBuffer);
 
             return outBuffer;
 
