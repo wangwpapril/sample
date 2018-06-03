@@ -779,8 +779,8 @@ public class KeyExchangeUtil {
     private byte[] aes256Decrypt2(byte[] key, byte[] encryptedData) {
         try{
 
-            print("data before decrypt", encryptedData);
-            print("mIv before decrypt", mIv);
+//            print("data before decrypt", encryptedData);
+//            print("mIv before decrypt", mIv);
 
 
             BufferedBlockCipher cipher = new BufferedBlockCipher(new CBCBlockCipher(new AESEngine()));

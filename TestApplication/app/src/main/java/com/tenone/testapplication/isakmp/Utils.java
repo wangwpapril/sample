@@ -49,6 +49,7 @@ public class Utils {
 
     private static final String TAG = "Utils";
     private static Context appContext;
+    private static final int DEFAULT_SIZE = 65535;
 
     public static String getSSID(Context context) {
         String ssid = null;
@@ -652,5 +653,35 @@ public class Utils {
                 ((ip >> 8) & 0xFF) + "." +
                 ((ip >> 16) & 0xFF) + "." +
                 (ip >> 24 & 0xFF);
+    }
+
+    public static byte[] ipv4AddressToBytes(String ipAddress) {
+        // in case the ip address is \10.0.2.15
+        String[] parts = ipAddress.replace("\\", "").split("\\.");
+
+        byte[] data = new byte[4];
+        data[0] = Utils.toBytes(Integer.valueOf(parts[0]), 1)[0];
+        data[1] = Utils.toBytes(Integer.valueOf(parts[1]), 1)[0];
+        data[2] = Utils.toBytes(Integer.valueOf(parts[2]), 1)[0];
+        data[3] = Utils.toBytes(Integer.valueOf(parts[3]), 1)[0];
+
+        return data;
+    }
+
+    public static byte[] combineData(byte[][] inputArray) {
+        ByteBuffer byteBuffer = ByteBuffer.allocate(DEFAULT_SIZE);
+        int length = 0;
+        for (int i = 0; i < inputArray.length; i++) {
+            byteBuffer.put(inputArray[i]);
+            length += inputArray[i].length;
+        }
+
+        byteBuffer.limit(length);
+
+        byte[] ret = new byte[length];
+        byteBuffer.position(0);
+        byteBuffer.get(ret, 0, length);
+
+        return ret;
     }
 }

@@ -42,7 +42,7 @@ public class ESPPayload {
         byte[] dataForCompareICV = new byte[12];
         System.arraycopy(KeyExchangeUtil.getInstance().generateESPInboundICV(dataBeforeICV), 0, dataForCompareICV, 0, dataForCompareICV.length);
         if (Arrays.equals(dataForCompareICV, ICV)) {
-            Log.d(TAG, "Incoming packet has been verified");
+//            Log.d(TAG, "Incoming packet has been verified");
         } else {
             Log.d(TAG, "Incoming packet has not been verified");
         }
