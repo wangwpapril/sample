@@ -723,7 +723,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
         builder.setMtu(1500);
 
-        builder.setBlocking(false);
+//        builder.setBlocking(false);
         builder.addAddress(ia, 0);
 //        builder.addAddress(Utils.getIPAddress1(getApplicationContext()), 0);
 //        builder.addAddress("10.10.68.200", 0);
@@ -731,7 +731,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
         builder.addRoute("0.0.0.0", 0);
 
-        builder.addRoute(mServerAddress, 32);
+//        builder.addRoute(mServerAddress, 32);
         //builder.addRoute("172.31.29.172", 32);
         builder.addDnsServer("8.8.8.8");
 
@@ -1733,10 +1733,11 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         byte[] port = Utils.toBytes(500, 2);
 
         byte[] data = new byte[4];
-        data[0] = Utils.toBytes(10, 1)[0];
-        data[1] = Utils.toBytes(10, 1)[0];
-        data[2] = Utils.toBytes(68, 1)[0];
-        data[3] = Utils.toBytes(104, 1)[0];
+        String[] ip = Utils.getIPAddress1(getApplicationContext()).replace("\\", "").split("\\.");
+        data[0] = Utils.toBytes(Integer.valueOf(ip[0]), 1)[0];
+        data[1] = Utils.toBytes(Integer.valueOf(ip[1]), 1)[0];
+        data[2] = Utils.toBytes(Integer.valueOf(ip[2]), 1)[0];
+        data[3] = Utils.toBytes(Integer.valueOf(ip[3]), 1)[0];
 
         int size = nextPayload.length + reserved.length + 2/*payloadLength.length*/ + idType.length +
                 protocolId.length + port.length + data.length;
@@ -2384,7 +2385,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         System.arraycopy(newIv, 0, payload, mOutbountESPSPI.length + 4, newIv.length);
         System.arraycopy(encryptedData, 0, payload, mOutbountESPSPI.length + 4 + newIv.length, encryptedData.length);
 
-        byte[] fullICVBytes = KeyExchangeUtil.getInstance().hashDataWithoutKey(payload);
+        byte[] fullICVBytes = KeyExchangeUtil.getInstance().generateESPOutboundICV(payload);
         byte[] payloadWithICV = new byte[payload.length + 12];
         System.arraycopy(payload, 0, payloadWithICV, 0, payload.length);
         // only copy the first 12 bytes

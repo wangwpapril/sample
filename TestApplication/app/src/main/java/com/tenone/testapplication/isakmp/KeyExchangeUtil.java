@@ -50,8 +50,10 @@ public class KeyExchangeUtil {
     private byte[] mSKEYIDd;
     private byte[] mSKEYIDa;
     private byte[] mSKEYIDe;
-    private byte[] mInboundKeyMaterial;
-    private byte[] mOutboundKeyMaterial;
+    private byte[] mInboundEncryptKeyMaterial;
+    private byte[] mInboundAuthKeyMaterial;
+    private byte[] mOutboundEncryptKeyMaterial;
+    private byte[] mOutboundAuthKeyMaterial;
     private byte[] mIv;
     private byte[] mFirstPhaseIv;
     private byte[] mServerPublicKeyData;
@@ -175,8 +177,9 @@ public class KeyExchangeUtil {
 //            System.arraycopy(eh5, 0, temp, 0, eh5.length);
 //            System.arraycopy(iv5, 0, temp, eh5.length, iv5.length);
 //            System.arraycopy(d5, 0, temp, eh5.length + iv5.length, d5.length);
+//            byte[] hk5 = {(byte)0x71,(byte)0x52,(byte)0xf1,(byte)0xce,(byte)0xe5,(byte)0x6b,(byte)0x31,(byte)0xf6,(byte)0x44,(byte)0xf1,(byte)0xb1,(byte)0x48,(byte)0x34,(byte)0xa2,(byte)0x9f,(byte)0xc4,(byte)0x62,(byte)0xf0,(byte)0x77,(byte)0x43,(byte)0x35,(byte)0x6f,(byte)0x63,(byte)0x6f,(byte)0xde,(byte)0xd9,(byte)0xa6,(byte)0xf8,(byte)0x43,(byte)0xb8,(byte)0xf9,(byte)0x4b};
 //
-//            output = hashDataWithoutKey(temp);
+//            output = hashDataWithKey(hk5, temp);
 //
 //            for (int i = 0; i < hash5.length; i++) {
 //                if (output[i] != hash5[i]) {
@@ -414,18 +417,33 @@ public class KeyExchangeUtil {
         System.arraycopy(initiatorNonce2, 0, data, 1 + 4, initiatorNonce2.length);
         System.arraycopy(mResponderNonce2, 0, data, 1 + 4 + initiatorNonce2.length, mResponderNonce2.length);
 
-        mInboundKeyMaterial = hashDataWithKey(mSKEYIDd, data);
+        mInboundEncryptKeyMaterial = hashDataWithKey(mSKEYIDd, data);
+
+        byte[] data2 = new byte[mInboundEncryptKeyMaterial.length + data.length];
+        System.arraycopy(mInboundEncryptKeyMaterial, 0, data2, 0, mInboundEncryptKeyMaterial.length);
+        System.arraycopy(data, 0, data2, mInboundEncryptKeyMaterial.length, data.length);
+
+        mInboundAuthKeyMaterial = hashDataWithKey(mSKEYIDd, data2);
 
         System.arraycopy(Utils.toBytes(3, 1), 0, data, 0, 1);
         System.arraycopy(responderSPI, 0, data, 1, 4);
         System.arraycopy(initiatorNonce2, 0, data, 1 + 4, initiatorNonce2.length);
         System.arraycopy(mResponderNonce2, 0, data, 1 + 4 + initiatorNonce2.length, mResponderNonce2.length);
 
-        mOutboundKeyMaterial = hashDataWithKey(mSKEYIDd, data);
+        mOutboundEncryptKeyMaterial = hashDataWithKey(mSKEYIDd, data);
 
-        print("Outbound Keying Material", mOutboundKeyMaterial);
+        System.arraycopy(mOutboundEncryptKeyMaterial, 0, data2, 0, mOutboundEncryptKeyMaterial.length);
+        System.arraycopy(data, 0, data2, mOutboundEncryptKeyMaterial.length, data.length);
 
-        print("Inbound Keying Material", mInboundKeyMaterial);
+        mOutboundAuthKeyMaterial = hashDataWithKey(mSKEYIDd, data2);
+
+        print("Outbound Encrypt Keying Material", mOutboundEncryptKeyMaterial);
+
+        print("Outbound auth key", mOutboundAuthKeyMaterial);
+
+        print("Inbound Encrypt Keying Material", mInboundEncryptKeyMaterial);
+
+        print("Inbound auth key", mInboundAuthKeyMaterial);
 
         print("My SPI", Utils.toBytes(mSPI));
         print("responder SPI", responderSPI);
@@ -548,11 +566,11 @@ public class KeyExchangeUtil {
     }
 
     public byte[] encryptESPPayload(byte[] payload) {
-        return aes256Encrypt2(mOutboundKeyMaterial, payload);
+        return aes256Encrypt2(mOutboundEncryptKeyMaterial, payload);
     }
 
     public byte[] decryptESPPayload(byte[] payload) {
-        return aes256Decrypt2(mInboundKeyMaterial, payload);
+        return aes256Decrypt2(mInboundEncryptKeyMaterial, payload);
     }
 
     public byte[] encryptData(byte[] payloadData) {
@@ -636,6 +654,14 @@ public class KeyExchangeUtil {
         }
 
         return null;
+    }
+
+    public byte[] generateESPOutboundICV(byte[] data) {
+        return hashDataWithKey(mOutboundAuthKeyMaterial, data);
+    }
+
+    public byte[] generateESPInboundICV(byte[] data) {
+        return hashDataWithKey(mInboundAuthKeyMaterial, data);
     }
 
     public byte[] hashDataWithoutKey(byte[] data) {

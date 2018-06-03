@@ -1,6 +1,9 @@
 package com.tenone.testapplication.isakmp;
 
+import android.util.Log;
+
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 public class ESPPayload {
     public byte[] spi;
@@ -12,6 +15,8 @@ public class ESPPayload {
     public byte[] padLength;
     public byte[] nextHeader;
     public byte[] payload;
+
+    private static final String TAG = "ESPPayload";
 
 
     public ESPPayload(ByteBuffer buffer) {
@@ -28,7 +33,19 @@ public class ESPPayload {
         encryptedData = new byte[encryptedDataLength];
         buffer.get(encryptedData, 0, encryptedDataLength);
 
+        ICV = new byte[12];
         buffer.get(ICV, 0, 12);
+
+        byte[] dataBeforeICV = new byte[buffer.limit() - 12];
+        buffer.position(0);
+        buffer.get(dataBeforeICV, 0, dataBeforeICV.length);
+        byte[] dataForCompareICV = new byte[12];
+        System.arraycopy(KeyExchangeUtil.getInstance().generateESPInboundICV(dataBeforeICV), 0, dataForCompareICV, 0, dataForCompareICV.length);
+        if (Arrays.equals(dataForCompareICV, ICV)) {
+            Log.d(TAG, "Incoming packet has been verified");
+        } else {
+            Log.d(TAG, "Incoming packet has not been verified");
+        }
 
         decryptedData = KeyExchangeUtil.getInstance().decryptESPPayload(encryptedData);
 
