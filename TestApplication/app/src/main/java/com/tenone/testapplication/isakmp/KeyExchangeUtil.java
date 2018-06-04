@@ -21,6 +21,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Random;
 
 import javax.crypto.KeyAgreement;
@@ -201,7 +202,7 @@ public class KeyExchangeUtil {
 
             KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH");
             keyPairGenerator.initialize(parameterSpec, new SecureRandom());
-            keyPairGenerator.initialize(parameterSpec);
+//            keyPairGenerator.initialize(parameterSpec);
             mKeyPair = keyPairGenerator.generateKeyPair();
             mKeyAgree = KeyAgreement.getInstance("DH");
             mKeyAgree.init(mKeyPair.getPrivate());
@@ -216,8 +217,19 @@ public class KeyExchangeUtil {
 
     public byte[] getPublicKey() {
 
+        byte[] key;
         BigInteger bigIntegerPublicKey = ((DHPublicKey)mKeyPair.getPublic()).getY();
-        return bigIntegerPublicKey.toByteArray();
+//        return bigIntegerPublicKey.toByteArray();
+        key = bigIntegerPublicKey.toByteArray();
+        int length = bigIntegerPublicKey.bitLength();
+        Log.e(TAG, "Public key length=" + key.length + "  bitlength=" + length);
+        print("Public Key", key);
+        if (length == 2048) {
+            key = Arrays.copyOfRange(key, 1, key.length);
+            Log.e(TAG, "Public key remove 0 length=" + key.length + "  bitlength=" + length);
+        }
+
+        return key;
     }
 
     public byte[] getPrivateKey() {
