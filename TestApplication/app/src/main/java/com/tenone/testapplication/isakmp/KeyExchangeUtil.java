@@ -619,17 +619,17 @@ public class KeyExchangeUtil {
         return output;
     }
 
-    public byte[] generateESPSPI() {
-        SecureRandom random = new SecureRandom();
-
-        while (true) {
-            int randomNum = random.nextInt();
-            // 0 is reserved for local, 1 - 255 are reserved by IANA
-            if (randomNum > 255){
-                return Utils.toBytes(randomNum);
-            }
-        }
-    }
+//    public byte[] generateESPSPI() {
+//        SecureRandom random = new SecureRandom();
+//
+//        while (true) {
+//            int randomNum = random.nextInt();
+//            // 0 is reserved for local, 1 - 255 are reserved by IANA
+//            if (randomNum > 255){
+//                return Utils.toBytes(randomNum);
+//            }
+//        }
+//    }
 
     public void print(String label, byte[] data) {
         StringBuilder stringBuilder = new StringBuilder();

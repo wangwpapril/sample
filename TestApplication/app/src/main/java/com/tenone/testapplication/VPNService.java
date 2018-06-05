@@ -49,7 +49,8 @@ import static android.system.OsConstants.AF_INET6;
 public class VPNService extends VpnService implements Handler.Callback, Runnable{
 
     private static final String TAG = "VPNService";
-    private static final int CONNECTION_RETRY_COUNT = 1;
+    private static final int CONNECTION_RETRY_COUNT = 6;
+    private static final int CONNECTION_RETRY_TIMEOUT = 15000;
     private static final int CONNECTION_WAIT_TIMOUT = 300;
     private static final int HANDSHAKE_BUFFER = 1024;
     private static final int DEFAULT_PACKET_SIZE = 32767;
@@ -151,7 +152,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             // Start a new session by creating a new thread.
             vpnThread = new Thread(this, TAG);
             vpnThread.start();
-            return START_STICKY;
+            return START_REDELIVER_INTENT;
         }
 
         return super.onStartCommand(intent, flags, startId);
@@ -177,7 +178,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         try {
             Log.d(TAG, "Starting");
             mESPSequenceNumber = 0;
-            mInboundESPSPI = KeyExchangeUtil.getInstance().generateESPSPI();
+//            mInboundESPSPI = KeyExchangeUtil.getInstance().generateESPSPI();
 
             // If anything needs to be obtained using the network, get it now.
             // This greatly reduces the complexity of seamless handover, which
@@ -189,11 +190,12 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             for (int attempt = 0; attempt < CONNECTION_RETRY_COUNT; ++attempt) {
 //                handler.sendEmptyMessage(R.string.VPN_connecting);
                 // Reset the counter if we were connected.
+                Log.e(TAG, "retry connection for :" + attempt);
                 if (run(server)) {
                     attempt = 0;
                 }
                 // Sleep for a while. This also checks if we got interrupted.
-                Thread.sleep(CONNECTION_WAIT_TIMOUT);
+                Thread.sleep(CONNECTION_RETRY_TIMEOUT);
             }
             Log.d(TAG, "Giving up");
         } catch (Exception e) {
@@ -208,7 +210,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 Log.e(TAG, "FileDescriptor close failed " + e);
             }
             fileDescriptor = null;
-            vpnParameters = null;
+//            vpnParameters = null;
 //            handler.sendEmptyMessage(R.string.VPN_disconnected);
             Log.d(TAG, "Exiting");
         }
@@ -231,7 +233,9 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
             // Authenticate and configure the virtual network interface.
             if (sharedSecret != null) {
-                doHandshake(tunnel);
+                if (!doHandshake(tunnel)) {
+                    return false;
+                }
             } else {
                 establishVPN();
             }
@@ -348,10 +352,11 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         return connected;
     }
 
-    private void doHandshake(DatagramChannel tunnel) {
+    private boolean doHandshake(DatagramChannel tunnel) {
 
         ByteBuffer packet = ByteBuffer.allocate(HANDSHAKE_BUFFER);
-        for (int i = 1; i <= 10; i++) {
+        boolean success = false;
+        for (int i = 1; i <= 8; i++) {
             if (i == 3) {
                 try {
                     InetSocketAddress socketAddress = new InetSocketAddress(mServerAddress, 4500);
@@ -367,15 +372,18 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     break;
                 }
             }
-            ResponseBase base = messageHandler(i, packet, tunnel);
-            if (base == null) {
+            if(!(success = messageHandler(i, packet, tunnel))){
                 break;
             }
         }
+
+        return success;
     }
 
-    private ResponseBase messageHandler(int index, ByteBuffer packet, DatagramChannel tunnel) {
+    private boolean messageHandler(int index, ByteBuffer packet, DatagramChannel tunnel) {
         ResponseBase responseBase = null;
+        boolean success = false;
+
 
         switch (index) {
             case 1:
@@ -387,6 +395,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         responseBase = new ResponseMainModeFirst(packet);
                         if (responseBase != null && responseBase.isValid()) {
                             isakmpHeader = responseBase.isakmpHeader;
+                            success = true;
                         }
                     }
                 }
@@ -410,6 +419,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                                     KeyExchangeUtil.getInstance().setResponderNonce(nonceData);
                                 }
                             }
+                            success = true;
                         }
                     }
                 }
@@ -443,6 +453,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                             if (response != null && response.isValid()) {
                                 responseBase = response;
                                 KeyExchangeUtil.getInstance().setFirstPhaseIv(response.getNextIv());
+                                success = true;
                                 break;
                             }
                         }
@@ -463,6 +474,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         packet.put(prependNonESPMarker(payload)).flip();
 
                         if (sendMessage(packet, tunnel)) {
+                            success = true;
                             break;
                         }
                     }
@@ -494,6 +506,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                             if (sendMessage(packet, tunnel)) {
                                 System.arraycopy(thirdMsg, thirdMsg.length - 16, Iv, 0, 16);
                                 KeyExchangeUtil.getInstance().setIV(Iv);
+                                success = true;
                                 break;
                             }
                         }
@@ -525,6 +538,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                                 byte[] Iv = new byte[16];
                                 System.arraycopy(firstMsgQuickMode, firstMsgQuickMode.length - 16, Iv, 0, 16);
                                 KeyExchangeUtil.getInstance().setIV(Iv);
+                                success = true;
 
                             }
                         }
@@ -537,6 +551,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     packet.position(0);
 
                     ResponseQuickModeFirst response = new ResponseQuickModeFirst(packet);
+                    Log.e(TAG, "read quick mode second message");
                     if (response != null && response.isValid()) {
                         responseBase = response;
                         isakmpHeader = response.isakmpHeader;
@@ -552,6 +567,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         packet.put(prependNonESPMarker(lastMsg)).flip();
                         if (sendMessage(packet, tunnel)) {
                             Log.d(TAG, "Sent last message in quick mode");
+                            success = true;
                         }
                         break;
                     }
@@ -559,11 +575,12 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 break;
             case 8:
                 setUp();
+                success = true;
                 break;
             default:
                 break;
         }
-        return responseBase;
+        return success;
     }
 
     private boolean sendMessage(ByteBuffer packet, DatagramChannel tunnel) {
@@ -615,14 +632,17 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
     private void setUp() {
         if (fileDescriptor != null) {
-            Log.d(TAG, "Using the previous interface");
-            return;
+            try {
+                fileDescriptor.close();
+            } catch (IOException e) {
+                Log.e(TAG, "File descriptor is already closed " + e);
+            }
         }
         InetAddress ia = null;
-        InetAddress ir = null;
+//        InetAddress ir = null;
         try {
             ia = InetAddress.getByAddress(ipAddress);
-            ir = InetAddress.getByAddress(subnet);
+//            ir = InetAddress.getByAddress(subnet);
 
         } catch (UnknownHostException e) {
             e.printStackTrace();
@@ -632,7 +652,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         // Configure a builder while parsing the parameters.
         Builder builder = new Builder();
 
-        builder.setMtu(1500);
+        builder.setMtu(1000);
 
         builder.addAddress(ia, 0);
         builder.addRoute("0.0.0.0", 0);
