@@ -34,6 +34,7 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -683,5 +684,21 @@ public class Utils {
         byteBuffer.get(ret, 0, length);
 
         return ret;
+    }
+
+    public int generateRandomInt() {
+        SecureRandom random = new SecureRandom();
+
+        return random.nextInt();
+    }
+
+    public byte[] generateRandomBytes(int byteNumber) {
+        SecureRandom random = new SecureRandom();
+
+        byte[] randomBytes = new byte[byteNumber];
+
+        random.nextBytes(randomBytes);
+
+        return randomBytes;
     }
 }
