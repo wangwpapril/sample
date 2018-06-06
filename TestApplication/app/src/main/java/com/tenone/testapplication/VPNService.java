@@ -343,6 +343,12 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         } finally {
             try {
                 if (tunnel != null) {
+//                    byte[] deletePayload = prepareDeletePayload();
+//                    ByteBuffer payload = ByteBuffer.allocate(deletePayload.length);
+//                    payload.put(deletePayload).flip();
+//                    tunnel.write(payload);
+//
+//                    KeyExchangeUtil.getInstance().print("deletePayload", deletePayload);
                     tunnel.close();
                 }
             } catch (IOException e) {
@@ -819,6 +825,50 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 //        System.arraycopy(vidPayloads, 0, firstMsg, header.length + mSAPayload.length, vidPayloads.length);
 
         return firstMsg;
+    }
+
+    private byte[] prepareDeletePayload() {
+
+
+        byte[] nextPayload = Utils.toBytes(0, 1);
+        //nextPayload[0] = 0;
+        byte[] reserved = new byte[1];
+        //byte[] payloadLength = new byte[2];
+        byte[] doi = Utils.toBytes(1);
+        byte[] protocolId = Utils.toBytes(3, 1);
+        byte[] spiSize = Utils.toBytes(8, 1);
+        byte[] numberSpi = Utils.toBytes(2, 2);
+        byte[] spiInit = Utils.toBytes(KeyExchangeUtil.getInstance().getSPI());
+        byte[] spiResp = mOutbountESPSPI;
+
+
+
+        byte[] proposalPayload = prepareProposalPayload();
+
+        int size = nextPayload.length + reserved.length + 2/*payloadLength.length*/ + doi.length + protocolId.length
+                + spiSize.length + numberSpi.length + spiInit.length + spiResp.length;
+
+        byte[] payloadLength = Utils.toBytes(size, 2);
+
+        byte[] payload = new byte[size + 4];
+
+//        byte[][] dataArray = {nextPayload, reserved, payloadLength, doi, situation, proposalPayload};
+//        byte[] saPayload = Utils.combineData(dataArray);
+
+//        byte[] saPayload = new byte[size];
+//
+        System.arraycopy(nextPayload, 0, payload, 4, 1);
+        System.arraycopy(reserved, 0, payload, 5, 1);
+        System.arraycopy(payloadLength, 0, payload, 6, 2);
+        System.arraycopy(doi, 0, payload, 8, 4);
+        System.arraycopy(protocolId, 0, payload, 12, 1);
+        System.arraycopy(spiSize, 0, payload, 13, 1);
+        System.arraycopy(numberSpi, 0, payload, 14, 2);
+        System.arraycopy(spiInit, 0, payload, 16, 4);
+        System.arraycopy(spiResp, 0, payload, 20, 4);
+
+        return payload;
+
     }
 
     private byte[] prepareSAPayload() {
@@ -2358,11 +2408,13 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
     }
 
     private byte[] prepareESPPayload(byte[] inputData) {
+        byte[] newIv = new byte[16];
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(newIv);
 
-        byte[] newIv = genereate16RandomBytes();
         KeyExchangeUtil.getInstance().setIV(newIv);
 
-        int len = inputData.length + 1/*padLength*/ + 1/*nextHeader*/;
+        int len = inputData.length + 2/*padLength*//*nextHeader*/;
 
         int padLength = len % 16;
         if (padLength != 0) {
@@ -2373,25 +2425,29 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         byte[] padBytes = null;
         if (padLength > 0) {
             padBytes = new byte[padLength];
-            for (int i = 0; i < padLength; i++) {
-                padBytes[i] = (byte)(i + 1);
-            }
+//            for (int i = 0; i < padLength; i++) {
+//                padBytes[i] = (byte)(i + 1);
+//            }
         }
-        byte[] nextHeader = Utils.toBytes(4, 1);
+//        byte[] nextHeader = Utils.toBytes(4, 1);
         byte[] dataForEncryption = new byte[len];
         System.arraycopy(inputData, 0, dataForEncryption, 0, inputData.length);
         if (padLength > 0) {
             System.arraycopy(padBytes, 0, dataForEncryption, inputData.length, padLength);
         }
-        System.arraycopy(Utils.toBytes(padLength, 1), 0, dataForEncryption,
-                inputData.length + padLength, 1);
-        System.arraycopy(nextHeader, 0, dataForEncryption,
-                inputData.length + padLength + 1, nextHeader.length);
+//        System.arraycopy(Utils.toBytes(padLength, 1), 0, dataForEncryption,
+//                inputData.length + padLength, 1);
+//        System.arraycopy(nextHeader, 0, dataForEncryption,
+//                inputData.length + padLength + 1, nextHeader.length);
+
+        int padLengthPosition = inputData.length + padLength;
+        dataForEncryption[padLengthPosition] = (byte)padLength;
+        dataForEncryption[++padLengthPosition] = (byte)4;
 
 //        KeyExchangeUtil.getInstance().print("ESP payload before adding header and encrypted. PadLength: " + padLength, dataForEncryption);
 
         byte[] encryptedData = KeyExchangeUtil.getInstance().encryptESPPayload(dataForEncryption);
-        len = mOutbountESPSPI.length + 4/*mESPSequenceNumber*/ + newIv.length + encryptedData.length;
+//        len = mOutbountESPSPI.length + 4/*mESPSequenceNumber*/ + newIv.length + encryptedData.length;
 
         byte[][] dataArray = {mOutbountESPSPI, Utils.toBytes(++mESPSequenceNumber), newIv, encryptedData};
         byte[] payload = Utils.combineData(dataArray);
