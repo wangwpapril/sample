@@ -881,7 +881,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         byte[] doi = Utils.toBytes(1);
         byte[] situation = Utils.toBytes(1);
 
-        byte[] proposalPayload = prepareProposalPayload();
+        byte[] proposalPayload = prepareProposalPayload1();
 
         int size = nextPayload.length + reserved.length + 2/*payloadLength.length*/ + doi.length + situation.length + proposalPayload.length;
 
@@ -1044,7 +1044,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
     private byte[] prepareTransformPayload(int i) {
         byte[] nextPayload = null;
-        if (i < 15) {
+        if (1 < i && i < 15) {
             nextPayload = Utils.toBytes(3, 1);    // 3 - Transform payload
         } else {
             nextPayload = Utils.toBytes(0, 1);
@@ -2097,33 +2097,37 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         byte[] proposalNumber = Utils.toBytes(1, 1);
         byte[] protocolId = Utils.toBytes(3, 1);        // PROTO_IPSEC_ESP
         byte[] spiSize = Utils.toBytes(4, 1);
-        byte[] transformNumber = Utils.toBytes(12, 1);
+        byte[] transformNumber = Utils.toBytes(1, 1);
         byte[] spi = Utils.toBytes(KeyExchangeUtil.getInstance().getSPI());
 
-        byte[] transformPayload1 = preparePhase2TransformPayload(1, 3, 12);
-        byte[] transformPayload2 = preparePhase2TransformPayload(2, 3, 12);
-        byte[] transformPayload3 = preparePhase2TransformPayload(3, 3, 12);
-        byte[] transformPayload4 = preparePhase2TransformPayload(4, 3, 12);
-        byte[] transformPayload5 = preparePhase2TransformPayload(5, 3, 12);
-        byte[] transformPayload6 = preparePhase2TransformPayload(6, 3, 12);
-        byte[] transformPayload7 = preparePhase2TransformPayload(7, 3, 3);
-        byte[] transformPayload8 = preparePhase2TransformPayload(8, 3, 3);
-        byte[] transformPayload9 = preparePhase2TransformPayload(9, 3, 3);
-        byte[] transformPayload10 = preparePhase2TransformPayload(10, 3, 2);
-        byte[] transformPayload11 = preparePhase2TransformPayload(11, 3, 2);
-        byte[] transformPayload12 = preparePhase2TransformPayload(12, 0, 2);
+        byte[] transformPayload1 = preparePhase2TransformPayload(1, 0, 12);
+//        byte[] transformPayload2 = preparePhase2TransformPayload(2, 3, 12);
+//        byte[] transformPayload3 = preparePhase2TransformPayload(3, 3, 12);
+//        byte[] transformPayload4 = preparePhase2TransformPayload(4, 3, 12);
+//        byte[] transformPayload5 = preparePhase2TransformPayload(5, 3, 12);
+//        byte[] transformPayload6 = preparePhase2TransformPayload(6, 3, 12);
+//        byte[] transformPayload7 = preparePhase2TransformPayload(7, 3, 3);
+//        byte[] transformPayload8 = preparePhase2TransformPayload(8, 3, 3);
+//        byte[] transformPayload9 = preparePhase2TransformPayload(9, 3, 3);
+//        byte[] transformPayload10 = preparePhase2TransformPayload(10, 3, 2);
+//        byte[] transformPayload11 = preparePhase2TransformPayload(11, 3, 2);
+//        byte[] transformPayload12 = preparePhase2TransformPayload(12, 0, 2);
 
+//        int size = nextPayload.length + reserved.length + 2/*payloadLength.length*/ + proposalNumber.length +
+//                protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length +
+//                transformPayload2.length + transformPayload3.length + transformPayload4.length + transformPayload5.length +
+//                transformPayload6.length + transformPayload7.length + transformPayload8.length + transformPayload9.length +
+//                transformPayload10.length + transformPayload11.length + transformPayload12.length;
         int size = nextPayload.length + reserved.length + 2/*payloadLength.length*/ + proposalNumber.length +
-                protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length +
-                transformPayload2.length + transformPayload3.length + transformPayload4.length + transformPayload5.length +
-                transformPayload6.length + transformPayload7.length + transformPayload8.length + transformPayload9.length +
-                transformPayload10.length + transformPayload11.length + transformPayload12.length;
+                protocolId.length + spiSize.length + transformNumber.length + spi.length + transformPayload1.length;
 
         byte[] payloadLength = Utils.toBytes(size, 2);
+//        byte[][] dataArray = {nextPayload, reserved, payloadLength, proposalNumber, protocolId, spiSize, transformNumber,
+//                spi, transformPayload1, transformPayload2, transformPayload3, transformPayload4, transformPayload5,
+//                transformPayload6, transformPayload7, transformPayload8, transformPayload9, transformPayload10,
+//                transformPayload11, transformPayload12};
         byte[][] dataArray = {nextPayload, reserved, payloadLength, proposalNumber, protocolId, spiSize, transformNumber,
-            spi, transformPayload1, transformPayload2, transformPayload3, transformPayload4, transformPayload5,
-            transformPayload6, transformPayload7, transformPayload8, transformPayload9, transformPayload10,
-            transformPayload11, transformPayload12};
+                spi, transformPayload1};
 
         byte[] proposalPayload = Utils.combineData(dataArray);
 
