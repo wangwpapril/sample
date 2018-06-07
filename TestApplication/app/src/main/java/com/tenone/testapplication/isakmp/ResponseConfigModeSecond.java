@@ -23,7 +23,7 @@ public class ResponseConfigModeSecond extends ResponseDecryptBase {
 
     @Override
     boolean prepareIV() {
-        KeyExchangeUtil.getInstance().preparePhase2IV(Utils.toBytes(isakmpHeader.messageId, 4));
+        PayloadHelper.getInstance().preparePhase2IV(Utils.toBytes(isakmpHeader.messageId, 4));
         return true;
     }
 

@@ -18,11 +18,36 @@ import java.security.NoSuchAlgorithmException;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+/**
+ * The class contains encrypt, decrypt and hash algorithms for VPN payloads
+ */
+
 public class AlgorithmUtil {
 
+    public static final int AES_BLOCK_SIZE = 16;
     private static final String TAG = "AlgorithmUtil";
-    private static final int AES_BLOCK_SIZE = 16;
+    private static AlgorithmUtil instance;
     private byte[] mIv;
+    private byte[] mPhase1FirstIv;
+
+
+    public static AlgorithmUtil getInstance() {
+        if (instance == null) {
+            instance = new AlgorithmUtil();
+        }
+
+        return instance;
+    }
+
+    /**
+     * Encrypt data use AESCBC with padding
+     * @param key
+     * @param inputData
+     * @return
+     */
+    public byte[] aesEncryptData(byte[] key, byte[] inputData) {
+        return aesEncryptData(key, inputData, true);
+    }
 
     /**
      * Encrypt data use AESCBC
@@ -55,7 +80,17 @@ public class AlgorithmUtil {
     }
 
     /**
-     * Decrypt the data using AESCBC
+     * Decrypt data use AESCBC with padding
+     * @param key
+     * @param encryptedData
+     * @return
+     */
+    public byte[] aesDecryptData(byte[] key, byte[] encryptedData) {
+        return aesDecryptData(key, encryptedData, true);
+    }
+
+    /**
+     * Decrypt data using AESCBC
      * @param key
      * @param encryptedData
      * @param withPadding
@@ -91,7 +126,7 @@ public class AlgorithmUtil {
                 return removedPaddingBytes;
             }
 
-            print("data after decrypt", outBuffer);
+            //print("data after decrypt", outBuffer);
 
             return outBuffer;
 
@@ -103,15 +138,24 @@ public class AlgorithmUtil {
     }
 
     /**
-     * Hash the data without key
-     * @param provider
+     * Hash data with default algorithm SHA-256
      * @param data
      * @return
      */
-    public byte[] hashData(String provider, byte[] data) {
+    public byte[] hashData(byte[] data) {
+        return hashData("SHA-256", data);
+    }
+
+    /**
+     * Hash data without key
+     * @param algorithm
+     * @param data
+     * @return
+     */
+    public byte[] hashData(String algorithm, byte[] data) {
         byte[] output = null;
         try {
-            MessageDigest messageDigest = MessageDigest.getInstance(provider);
+            MessageDigest messageDigest = MessageDigest.getInstance(algorithm);
             messageDigest.update(data);
             output = messageDigest.digest();
         } catch (NoSuchAlgorithmException e) {
@@ -123,16 +167,26 @@ public class AlgorithmUtil {
     }
 
     /**
-     * Hash data with provided key
-     * @param provider
+     * Hash data using the default algorithm HmacSHA256
      * @param key
      * @param data
      * @return
      */
-    private byte[] hashDataWithKey(String provider, byte[] key, byte[] data) {
+    public byte[] hashDataWithKey(byte[] key, byte[] data) {
+        return hashDataWithKey("HmacSHA256", key, data);
+    }
+
+    /**
+     * Hash data with provided key
+     * @param algorithm
+     * @param key
+     * @param data
+     * @return
+     */
+    public byte[] hashDataWithKey(String algorithm, byte[] key, byte[] data) {
         try {
-            Mac mac = Mac.getInstance(provider);
-            SecretKeySpec secretKeySpec = new SecretKeySpec(key, provider);
+            Mac mac = Mac.getInstance(algorithm);
+            SecretKeySpec secretKeySpec = new SecretKeySpec(key, algorithm);
             mac.init(secretKeySpec);
 
             byte[] output = mac.doFinal(data);
@@ -148,11 +202,19 @@ public class AlgorithmUtil {
     }
 
     /**
-     * Get the Initialization Vector (IV)
+     * Get Initialization Vector (IV)
      * @return
      */
     public byte[] getIv() {
         return mIv;
+    }
+
+    /**
+     * Get the phase 1 first IV
+     * @return
+     */
+    public byte[] getPhase1FirstIv() {
+        return mPhase1FirstIv;
     }
 
     /**
@@ -161,6 +223,10 @@ public class AlgorithmUtil {
      */
     public void setIv(byte[] newIv) {
         mIv = newIv;
+    }
+
+    public void setPhase1FirstIv(byte[] iv) {
+        mPhase1FirstIv = iv;
     }
 
     private void print(String label, byte[] data) {

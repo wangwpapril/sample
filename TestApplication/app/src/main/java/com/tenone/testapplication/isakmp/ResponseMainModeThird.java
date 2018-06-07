@@ -46,11 +46,7 @@ public class ResponseMainModeThird extends ResponseDecryptBase {
         System.arraycopy(Utils.toBytes(payload.type, 1), 0, idPayload, 0, 1);
         System.arraycopy(payload.doiData, 0, idPayload, 1, 3);
         System.arraycopy(payload.data, 0, idPayload, 4, payload.data.length);
-        hashGenerated = KeyExchangeUtil.getInstance().generateResponder1stHashData(
-                isakmpHeader.initiatorCookie,
-                isakmpHeader.responderCookie,
-                idPayload
-        );
+        hashGenerated = PayloadHelper.getInstance().generateHashDataForMainModeMessage(idPayload);
 
     }
 
