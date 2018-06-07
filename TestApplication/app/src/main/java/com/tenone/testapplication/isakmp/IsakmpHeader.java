@@ -4,6 +4,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Random;
 
 /**
@@ -123,7 +124,7 @@ public class IsakmpHeader {
 
     private void prepareHeader() {
 
-        initiatorCookie = generateInitiatorCookie();
+        initiatorCookie = KeyExchangeUtil.getInstance().getInitiatorCookie();
         responderCookie = new byte[COOKIE_LENGTH];
         byte[] nextPayload = toBytes(nextPayloadType, 1);    // Security Association
 
@@ -146,7 +147,7 @@ public class IsakmpHeader {
 
     private void prepareHeader(int msgId) {
 
-        initiatorCookie = generateInitiatorCookie();
+        initiatorCookie = KeyExchangeUtil.getInstance().getInitiatorCookie();
         responderCookie = new byte[COOKIE_LENGTH];
         byte[] nextPayload = toBytes(nextPayloadType, 1);    // Security Association
 
@@ -266,5 +267,12 @@ public class IsakmpHeader {
 
     public boolean isEncrypted() {
         return (flags & FLAG) == FLAG;
+    }
+
+    public void updatePayloadLength(int length) {
+        payloadLength = length;
+        byte[] lenBytes = Utils.toBytes(length);
+        byte[][] dataArray = {Arrays.copyOfRange(headerData, 0, 24), lenBytes};
+        headerData = Utils.combineData(dataArray);
     }
 }

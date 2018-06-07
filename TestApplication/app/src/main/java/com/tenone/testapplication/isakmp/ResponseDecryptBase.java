@@ -62,7 +62,8 @@ public abstract class ResponseDecryptBase extends ResponseBase {
     void decryptData(ByteBuffer buffer) {
         encryptedData = new byte[isakmpHeader.payloadLength - 28];
         buffer.get(encryptedData, 0, isakmpHeader.payloadLength - 28);
-        decryptedData = KeyExchangeUtil.getInstance().decryptData(encryptedData);
+        decryptedData = AlgorithmUtil.getInstance().aesDecryptData(KeyExchangeUtil.getInstance().getSKEYIDe(), encryptedData);
+        //decryptedData = KeyExchangeUtil.getInstance().decryptData(encryptedData);
         if (decryptedData != null) {
             buffer.clear();
             buffer.put(decryptedData);
@@ -79,7 +80,7 @@ public abstract class ResponseDecryptBase extends ResponseBase {
         System.arraycopy(decryptedData, 36,
                 data, 0, totalLength);
 
-        hashGenerated = KeyExchangeUtil.getInstance().generateHashDataForAttributePayload(
+        hashGenerated = PayloadHelper.getInstance().generateHashDataForPayload(
                 Utils.toBytes(isakmpHeader.messageId, 4),
                 data
         );

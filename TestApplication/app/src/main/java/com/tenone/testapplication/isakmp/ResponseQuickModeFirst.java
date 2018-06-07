@@ -28,7 +28,7 @@ public class ResponseQuickModeFirst extends ResponseDecryptBase {
         System.arraycopy(decryptedData, 36,
                 data, nibody.length, totalLength);
 
-        hashGenerated = KeyExchangeUtil.getInstance().generateHashDataForAttributePayload(
+        hashGenerated = PayloadHelper.getInstance().generateHashDataForPayload(
                 Utils.toBytes(isakmpHeader.messageId, 4),
                 data
         );

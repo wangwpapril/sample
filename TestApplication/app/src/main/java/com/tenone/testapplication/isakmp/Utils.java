@@ -673,8 +673,10 @@ public class Utils {
         ByteBuffer byteBuffer = ByteBuffer.allocate(DEFAULT_SIZE);
         int length = 0;
         for (int i = 0; i < inputArray.length; i++) {
-            byteBuffer.put(inputArray[i]);
-            length += inputArray[i].length;
+            if (inputArray[i] != null) {
+                byteBuffer.put(inputArray[i]);
+                length += inputArray[i].length;
+            }
         }
 
         byteBuffer.limit(length);
