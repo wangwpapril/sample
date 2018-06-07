@@ -257,7 +257,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     byte[] readBytes = new byte[length];
                     System.arraycopy(packet.array(), 0, readBytes, 0, length);
 
-                    KeyExchangeUtil.getInstance().print("Outgoing packet before encryption", readBytes);
+                    //KeyExchangeUtil.getInstance().print("Outgoing packet before encryption", readBytes);
 
                     // adding the ESP header (SPI, sequence number), encryption, ICV, etc.
                     byte[] espPayload = mPayloadHelper.prepareESPPayload(readBytes);
@@ -291,7 +291,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         // check ICV, decrypt
                         ESPPayload espPayload = new ESPPayload(packet);
 
-                        KeyExchangeUtil.getInstance().print("Incoming packet after decryption", espPayload.decryptedData);
+                        //KeyExchangeUtil.getInstance().print("Incoming packet after decryption", espPayload.decryptedData);
 
                         out.write(espPayload.payload, 0, espPayload.payload.length);
                     }

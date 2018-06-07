@@ -119,6 +119,27 @@ public class KeyExchangeUtil {
         mResponderCookie = cookie;
     }
 
+    public boolean generatePairKeys(String preSharedSecret) {
+        DHParameterSpec parameterSpec;
+
+        try {
+            parameterSpec = new DHParameterSpec(mDH_P, mDH_G);
+
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH");
+            keyPairGenerator.initialize(parameterSpec, new SecureRandom());
+//            keyPairGenerator.initialize(parameterSpec);
+            mKeyPair = keyPairGenerator.generateKeyPair();
+            mKeyAgree = KeyAgreement.getInstance("DH");
+            mKeyAgree.init(mKeyPair.getPrivate());
+
+        } catch (NoSuchAlgorithmException | InvalidKeyException |  IllegalArgumentException | InvalidAlgorithmParameterException e) {
+            e.printStackTrace();
+            return false;
+        }
+
+        return true;
+    }
+
     public byte[] getPublicKey() {
 
         byte[] key;
@@ -392,27 +413,6 @@ public class KeyExchangeUtil {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    private boolean generatePairKeys(String preSharedSecret) {
-        DHParameterSpec parameterSpec;
-
-        try {
-            parameterSpec = new DHParameterSpec(mDH_P, mDH_G);
-
-            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH");
-            keyPairGenerator.initialize(parameterSpec, new SecureRandom());
-//            keyPairGenerator.initialize(parameterSpec);
-            mKeyPair = keyPairGenerator.generateKeyPair();
-            mKeyAgree = KeyAgreement.getInstance("DH");
-            mKeyAgree.init(mKeyPair.getPrivate());
-
-        } catch (NoSuchAlgorithmException | InvalidKeyException |  IllegalArgumentException | InvalidAlgorithmParameterException e) {
-            e.printStackTrace();
-            return false;
-        }
-
-        return true;
     }
 }
 
