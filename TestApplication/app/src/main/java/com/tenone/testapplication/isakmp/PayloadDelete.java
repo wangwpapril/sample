@@ -32,4 +32,33 @@ public class PayloadDelete extends PayloadBase {
         }
 
     }
+
+    public static class Builder extends PayloadBase.Builder {
+
+        public Builder Doi(int doi) {
+            this.dataList.add(Utils.toBytes(doi));
+            return this;
+        }
+
+        public Builder ProtocolId(int id) {
+            this.dataList.add(Utils.toBytes(id, 1));
+            return this;
+        }
+
+        public Builder SpiSize(int size) {
+            this.dataList.add(Utils.toBytes(size, 1));
+            return this;
+        }
+
+        public Builder SpiCount(int count) {
+            this.dataList.add(Utils.toBytes(count, 2));
+            return this;
+        }
+
+        public Builder SpiData(byte[] spi) {
+            this.dataList.add(spi);
+            return this;
+        }
+
+    }
 }
