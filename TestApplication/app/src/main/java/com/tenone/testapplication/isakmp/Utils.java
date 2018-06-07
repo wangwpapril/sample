@@ -703,4 +703,12 @@ public class Utils {
 
         return randomBytes;
     }
+
+    public static int toInt(byte[] b)
+    {
+        int value= 0;
+        for(int i=0; i<b.length; i++)
+            value = (value << 8) | b[i];
+        return value;
+    }
 }

@@ -26,6 +26,7 @@ import com.tenone.testapplication.isakmp.ResponseMainModeFirst;
 import com.tenone.testapplication.isakmp.ResponseMainModeSecond;
 import com.tenone.testapplication.isakmp.ResponseMainModeThird;
 import com.tenone.testapplication.isakmp.ResponseQuickModeFirst;
+import com.tenone.testapplication.isakmp.ResponseInformational;
 import com.tenone.testapplication.isakmp.Utils;
 
 import java.io.FileInputStream;
@@ -294,6 +295,13 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
                         out.write(espPayload.payload, 0, espPayload.payload.length);
                     }
+                    if (firstByte == 0) {
+                        KeyExchangeUtil.getInstance().print("0 Command", packet.array());
+                        ResponseInformational responseInformational = new ResponseInformational(packet);
+                        if (responseInformational != null) {
+
+                        }
+                    }
                     packet.clear();
                     // There might be more incoming packets.
                     idle = false;
@@ -322,7 +330,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     }
                     // We are sending for a long time but not receiving.
                     if (timer > DEFAULT_TIMER_MAX) {
-//                        throw new IllegalStateException("Timed out");
+                        throw new IllegalStateException("Timed out");
                     }
                 }
             }
@@ -334,6 +342,12 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         } finally {
             try {
                 if (tunnel != null) {
+//                    byte[] deletePayload = prepareDeletePayload();
+//                    ByteBuffer payload = ByteBuffer.allocate(deletePayload.length);
+//                    payload.put(deletePayload).flip();
+//                    tunnel.write(payload);
+//
+//                    KeyExchangeUtil.getInstance().print("deletePayload", deletePayload);
                     tunnel.close();
                 }
             } catch (IOException e) {
@@ -635,5 +649,6 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 //        vpnParameters = parameters;
 //        Log.d(TAG, "New interface: " + parameters);
     }
+
 
 }

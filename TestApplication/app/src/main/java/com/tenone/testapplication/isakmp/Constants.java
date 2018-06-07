@@ -24,6 +24,7 @@ public class Constants {
     public final static int ISAKMP_NPTYPE_NAT_D = 20;
 
     public final static int EXCHANGE_TYPE_MAIN_MODE = 2;
+    public final static int EXCHANGE_TYP_INFORMATIONAL = 5;
     public final static int EXCHANGE_TYPE_CONFIG_MODE = 6;
     public final static int EXCHANGE_TYPE_QUICK_MODE = 32;
 

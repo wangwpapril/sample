@@ -67,6 +67,9 @@ abstract public class ResponseBase {
             case Constants.ISAKMP_NPTYPE_ATTR:
                 PayloadAttribute payloadAttribute = new PayloadAttribute(buffer);
                 return payloadAttribute;
+            case Constants.ISAKMP_NPTYPE_D:
+                PayloadDelete payloadDelete = new PayloadDelete(buffer);
+                return payloadDelete;
             default:
                 return null;
         }
