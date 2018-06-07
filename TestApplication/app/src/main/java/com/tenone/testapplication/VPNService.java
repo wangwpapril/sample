@@ -25,6 +25,7 @@ import com.tenone.testapplication.isakmp.ResponseMainModeFirst;
 import com.tenone.testapplication.isakmp.ResponseMainModeSecond;
 import com.tenone.testapplication.isakmp.ResponseMainModeThird;
 import com.tenone.testapplication.isakmp.ResponseQuickModeFirst;
+import com.tenone.testapplication.isakmp.ResponseInformational;
 import com.tenone.testapplication.isakmp.Utils;
 
 import java.io.FileInputStream;
@@ -36,14 +37,10 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
-import java.security.Key;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Random;
-
-import static android.system.OsConstants.AF_INET;
-import static android.system.OsConstants.AF_INET6;
 
 
 public class VPNService extends VpnService implements Handler.Callback, Runnable{
@@ -303,6 +300,13 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
                         out.write(espPayload.payload, 0, espPayload.payload.length);
                     }
+                    if (firstByte == 0) {
+                        KeyExchangeUtil.getInstance().print("0 Command", packet.array());
+                        ResponseInformational responseInformational = new ResponseInformational(packet);
+                        if (responseInformational != null) {
+
+                        }
+                    }
                     packet.clear();
                     // There might be more incoming packets.
                     idle = false;
@@ -331,7 +335,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     }
                     // We are sending for a long time but not receiving.
                     if (timer > DEFAULT_TIMER_MAX) {
-//                        throw new IllegalStateException("Timed out");
+                        throw new IllegalStateException("Timed out");
                     }
                 }
             }
@@ -843,8 +847,6 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
 
 
-        byte[] proposalPayload = prepareProposalPayload();
-
         int size = nextPayload.length + reserved.length + 2/*payloadLength.length*/ + doi.length + protocolId.length
                 + spiSize.length + numberSpi.length + spiInit.length + spiResp.length;
 
@@ -852,11 +854,6 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
 
         byte[] payload = new byte[size + 4];
 
-//        byte[][] dataArray = {nextPayload, reserved, payloadLength, doi, situation, proposalPayload};
-//        byte[] saPayload = Utils.combineData(dataArray);
-
-//        byte[] saPayload = new byte[size];
-//
         System.arraycopy(nextPayload, 0, payload, 4, 1);
         System.arraycopy(reserved, 0, payload, 5, 1);
         System.arraycopy(payloadLength, 0, payload, 6, 2);
