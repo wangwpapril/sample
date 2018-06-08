@@ -325,7 +325,7 @@ public class PayloadHelper {
         byte[] nextHeader = Utils.toBytes(4, 1);
         byte[][] dataArray1 = {inputData, padBytes, Utils.toBytes(padLength, 1), nextHeader};
         byte[] dataForEncryption = Utils.combineData(dataArray1);
-        print("ESP payload before adding header and encrypted. PadLength: " + padLength, dataForEncryption);
+        //print("ESP payload before adding header and encrypted. PadLength: " + padLength, dataForEncryption);
 
         byte[] encryptedData = mAlgorithmUtil.aesEncryptData(mKeyExchangeUtil.getOutboundEncryptionKey(), dataForEncryption, false);
         byte[] outboundSPI = mKeyExchangeUtil.getOutboundSPI();
