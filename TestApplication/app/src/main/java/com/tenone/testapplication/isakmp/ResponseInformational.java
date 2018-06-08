@@ -3,6 +3,7 @@ package com.tenone.testapplication.isakmp;
 import java.nio.ByteBuffer;
 
 public class ResponseInformational extends ResponseDecryptBase {
+
     public ResponseInformational(ByteBuffer buffer) {
         super(buffer);
     }
@@ -25,5 +26,9 @@ public class ResponseInformational extends ResponseDecryptBase {
     boolean prepareIV() {
         PayloadHelper.getInstance().preparePhase2IV(Utils.toBytes(isakmpHeader.messageId));
         return true;
+    }
+
+    public boolean isDeleteSA() {
+        return payloadList != null && hasDeletePayload;
     }
 }

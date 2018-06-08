@@ -15,6 +15,8 @@ public abstract class ResponseDecryptBase extends ResponseBase {
     protected int attributeType;
     protected int attributeSize;
 
+    protected boolean hasDeletePayload;
+
     public ResponseDecryptBase(ByteBuffer buffer) {
         super(buffer, true);
         if (isDataValid() && prepareIV()) {
@@ -50,6 +52,8 @@ public abstract class ResponseDecryptBase extends ResponseBase {
                         attributeType = ((PayloadAttribute) payload).type;
 
                     }
+                }else if (payload instanceof PayloadDelete) {
+                    hasDeletePayload = true;
                 }
 
             }else {

@@ -244,6 +244,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             // works on both sides. A positive value means sending, and
             // any other means receiving. We start with receiving.
             int timer = 0;
+            long waitingStart = System.currentTimeMillis();
             // We keep forwarding packets till something goes wrong.
             while (true) {
                 // Assume that we did not make any progress in this iteration.
@@ -271,6 +272,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     packet.clear();
                     // There might be more outgoing packets.
                     idle = false;
+                    waitingStart = System.currentTimeMillis();
+                    Log.e(TAG, "Send request");
                     // If we were receiving, switch to sending.
                     if (timer < 1) {
                         timer = 1;
@@ -291,20 +294,55 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         // check ICV, decrypt
                         ESPPayload espPayload = new ESPPayload(packet);
 
-                        //KeyExchangeUtil.getInstance().print("Incoming packet after decryption", espPayload.decryptedData);
-
                         out.write(espPayload.payload, 0, espPayload.payload.length);
                     }
                     if (firstByte == 0) {
                         KeyExchangeUtil.getInstance().print("0 Command", packet.array());
                         ResponseInformational responseInformational = new ResponseInformational(packet);
-                        if (responseInformational != null) {
+                        if (responseInformational != null && responseInformational.isDeleteSA()) {
+                            //refresh SA
+                            boolean saRefreshed = false;
+                            byte[] firstQuickModeMsg = mPayloadHelper.preparePhase2QuickModeFirstMsg();
+                            KeyExchangeUtil.getInstance().print("Refresh SA", firstQuickModeMsg);
+                            packet.clear();
+                            packet.put(firstQuickModeMsg).flip();
+                            if (sendMessage(packet, tunnel)) {
+                                Log.d(TAG, "SENT FIRST MESSAGE IN QUICK MODE");
+                                mPayloadHelper.updateIVWithEncryptedData(firstQuickModeMsg);
+                                while (readMessage(packet, tunnel)) {
+                                    packet.position(0);
+
+                                    ResponseQuickModeFirst response = new ResponseQuickModeFirst(packet);
+                                    Log.e(TAG, "read quick mode second message");
+                                    if (response != null && response.isValid()) {
+                                        mPayloadHelper.setIsakmpHeader(response.isakmpHeader);
+                                        mAlgorithmUtil.setIv(response.getNextIv());
+
+                                        packet.clear();
+                                        byte[] responderNonce = ((PayloadNonce)response.payloadList.get(2)).nonceData;
+                                        byte[] outboundSPI = ((PayloadSA)response.payloadList.get(1)).payloadProposal.spiData;
+                                        KeyExchangeUtil.getInstance().prepareKeyMaterial(responderNonce, outboundSPI);
+                                        byte[] lastMsg = mPayloadHelper.preparePhase2QuickModeSecondMsg();
+                                        packet.put(lastMsg).flip();
+                                        if (sendMessage(packet, tunnel)) {
+                                            saRefreshed = true;
+                                            Log.d(TAG, "Sent last message in quick mode");
+                                        }
+                                        break;
+                                    }
+                                }
+
+                            }
+
+                            if (!saRefreshed) {
+                                break;
+                            }
 
                         }
                     }
                     packet.clear();
                     // There might be more incoming packets.
-                    idle = false;
+//                    idle = false;
                     // If we were sending, switch to receiving.
                     if (timer > 0) {
                         timer = 0;
@@ -313,25 +351,33 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 // If we are idle or waiting for the network, sleep for a
                 // fraction of time to avoid busy looping.
                 if (idle) {
+                    if ((System.currentTimeMillis() - waitingStart) > 20000) {
+                        packet.put((byte) 0xff).limit(1);
+                        packet.position(0);
+                        tunnel.write(packet);
+                        packet.clear();
+                        waitingStart = System.currentTimeMillis();
+                        Log.e(TAG, "Send Keepalive");
+                    }
                     Thread.sleep(CONNECTION_WAIT_TIMOUT);
                     // since everything is operated in non-blocking mode.
-                    timer += (timer > 0) ? DEFAULT_TIMER : DEFAULT_TIMER_NEGATIVE;
-                    // We are receiving for a long time but not sending.
-                    if (timer < DEFAULT_TIMER_MIN) {
-                        // Send empty control messages.
-                        packet.put((byte) 0).limit(1);
-                        for (int i = 0; i < WRITER_RETRY_COUNT; ++i) {
-                            packet.position(0);
-                            tunnel.write(packet);
-                        }
-                        packet.clear();
-                        // Switch to sending.
-                        timer = 1;
-                    }
-                    // We are sending for a long time but not receiving.
-                    if (timer > DEFAULT_TIMER_MAX) {
-                        throw new IllegalStateException("Timed out");
-                    }
+//                    timer += (timer > 0) ? DEFAULT_TIMER : DEFAULT_TIMER_NEGATIVE;
+//                    // We are receiving for a long time but not sending.
+//                    if (timer < DEFAULT_TIMER_MIN) {
+//                        // Send empty control messages.
+//                        packet.put((byte) 0).limit(1);
+//                        for (int i = 0; i < WRITER_RETRY_COUNT; ++i) {
+//                            packet.position(0);
+//                            tunnel.write(packet);
+//                        }
+//                        packet.clear();
+//                        // Switch to sending.
+//                        timer = 1;
+//                    }
+//                    // We are sending for a long time but not receiving.
+//                    if (timer > DEFAULT_TIMER_MAX) {
+//                        throw new IllegalStateException("Timed out");
+//                    }
                 }
             }
         } catch (InterruptedException e) {
@@ -388,9 +434,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
     }
 
     private boolean messageHandler(int index, ByteBuffer packet, DatagramChannel tunnel) {
-        ResponseBase responseBase = null;
         boolean success = false;
-
 
         switch (index) {
             case 1:
@@ -399,7 +443,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 if(sendMessage(packet, tunnel)) {
                     if (readMessage(packet, tunnel)) {
                         packet.position(0);
-                        responseBase = new ResponseMainModeFirst(packet);
+                        ResponseMainModeFirst responseBase = new ResponseMainModeFirst(packet);
                         if (responseBase != null && responseBase.isValid()) {
                             mPayloadHelper.setIsakmpHeader(responseBase.isakmpHeader);
                             mKeyExchangeUtil.setResponderCookie(responseBase.isakmpHeader.responderCookie);
@@ -414,7 +458,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 if(sendMessage(packet, tunnel)) {
                     if (readMessage(packet, tunnel)) {
                         packet.position(0);
-                        responseBase = new ResponseMainModeSecond(packet);
+                        ResponseMainModeSecond responseBase = new ResponseMainModeSecond(packet);
                         if (responseBase != null && responseBase.isValid()) {
                             for (PayloadBase base : responseBase.payloadList) {
                                 if (base instanceof PayloadKeyEx) {
@@ -432,7 +476,6 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                 break;
             case 3:
                 packet.clear();
-
                 packet.put(mPayloadHelper.preparePhase1MainModeThirdMsg()).flip();
                 if (sendMessage(packet, tunnel)) {
 
@@ -472,11 +515,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     packet.position(0);
                     ResponseConfigModeSecond response = new ResponseConfigModeSecond(packet);
                     if (response != null && response.isValid()) {
-                        responseBase = response;
                         mPayloadHelper.setIsakmpHeader(response.isakmpHeader);
                         mAlgorithmUtil.setIv(response.getNextIv());
-//                        isakmpHeader = response.isakmpHeader;
-//                        KeyExchangeUtil.getInstance().setIV(response.getNextIv());
 
                         packet.clear();
                         byte[] secondMsg = mPayloadHelper.preparePhase2ConfigModeSecondMsg();
@@ -533,7 +573,6 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                     ResponseQuickModeFirst response = new ResponseQuickModeFirst(packet);
                     Log.e(TAG, "read quick mode second message");
                     if (response != null && response.isValid()) {
-                        responseBase = response;
                         mPayloadHelper.setIsakmpHeader(response.isakmpHeader);
                         mAlgorithmUtil.setIv(response.getNextIv());
 
@@ -617,11 +656,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             }
         }
         InetAddress ia = null;
-//        InetAddress ir = null;
         try {
             ia = InetAddress.getByAddress(mPayloadHelper.getServerProvidedIp());
-//            ir = InetAddress.getByAddress(subnet);
-
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
@@ -631,24 +667,14 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         Builder builder = new Builder();
 
         builder.setMtu(mMtu);
-
         builder.addAddress(ia, 0);
         builder.addRoute(mRoute, 0);
         builder.addDnsServer(mDnsServer);
 
-        // Close the old interface since the parameters have been changed.
-//        try {
-//            fileDescriptor.close();
-//        } catch (IOException e) {
-//            Log.e(TAG, "File descriptor is already closed " + e);
-//        }
         // Create a new interface using the builder and save the parameters.
         fileDescriptor = builder.setSession(mServerAddress)
 //                .setConfigureIntent(configureIntent)
                 .establish();
-//        vpnParameters = parameters;
-//        Log.d(TAG, "New interface: " + parameters);
     }
-
 
 }
