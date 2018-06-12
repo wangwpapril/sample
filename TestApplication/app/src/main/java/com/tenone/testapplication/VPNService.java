@@ -43,7 +43,7 @@ import java.nio.channels.DatagramChannel;
 public class VPNService extends VpnService implements Handler.Callback, Runnable{
 
     private static final String TAG = "VPNService";
-    private static final int CONNECTION_RETRY_COUNT = 6;
+    private static final int CONNECTION_RETRY_COUNT = 16;
     private static final int CONNECTION_RETRY_TIMEOUT = 15000;
     private static final int CONNECTION_WAIT_TIMOUT = 300;
     private static final int HANDSHAKE_BUFFER = 1024;
@@ -64,31 +64,19 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
     private Handler handler;
     private Thread vpnThread;
     private ParcelFileDescriptor fileDescriptor;
-    private String vpnParameters;
     private PendingIntent configureIntent;
 
     private PayloadHelper mPayloadHelper;
     private String mPreSharedSecret;
 
 
-    private static final int ADDRESS_BUFFER_SIZE = 4;
-
-    private static final int IKE_ATTRIBUTE_1 = 1;   // encryption-algorithm
-    private static final int IKE_ATTRIBUTE_2 = 2;   // hash-algorithm
-    private static final int IKE_ATTRIBUTE_3 = 3;   // authentication-method
-    private static final int IKE_ATTRIBUTE_4 = 4;   // group-description
-    private static final int IKE_ATTRIBUTE_11 = 11; // life-type
-    private static final int IKE_ATTRIBUTE_12 = 12; // life-duration
-    private static final int IKE_ATTRIBUTE_14 = 14; // key-length
-
     private String mUserName;
     private String mPassword;
 
-    private byte[] mInitiatorCookie = new byte[8];
-    private byte[] mResponderCookie = new byte[8];
     private KeyExchangeUtil mKeyExchangeUtil;
     private AlgorithmUtil mAlgorithmUtil;
 
+    private DatagramChannel tunnel;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -205,7 +193,7 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
     }
 
     private boolean run(InetSocketAddress server) throws InterruptedException {
-        DatagramChannel tunnel = null;
+//        DatagramChannel tunnel = null;
         boolean connected = false;
         try {
             // Create a DatagramChannel as the VPN tunnel.
@@ -237,8 +225,6 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             FileOutputStream out = new FileOutputStream(fileDescriptor.getFileDescriptor());
             // Allocate the buffer for a single packet.
             ByteBuffer packet = ByteBuffer.allocate(DEFAULT_PACKET_SIZE);
-
-            boolean isDataSend = true;
 
             // We use a timer to determine the status of the tunnel. It
             // works on both sides. A positive value means sending, and
@@ -295,48 +281,15 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
                         ESPPayload espPayload = new ESPPayload(packet);
 
                         out.write(espPayload.payload, 0, espPayload.payload.length);
+                        Log.e(TAG, "receive data from server");
                     }
                     if (firstByte == 0) {
                         KeyExchangeUtil.getInstance().print("0 Command", packet.array());
                         ResponseInformational responseInformational = new ResponseInformational(packet);
                         if (responseInformational != null && responseInformational.isDeleteSA()) {
                             //refresh SA
-                            boolean saRefreshed = false;
-                            byte[] firstQuickModeMsg = mPayloadHelper.preparePhase2QuickModeFirstMsg();
-                            KeyExchangeUtil.getInstance().print("Refresh SA", firstQuickModeMsg);
-                            packet.clear();
-                            packet.put(firstQuickModeMsg).flip();
-                            if (sendMessage(packet, tunnel)) {
-                                Log.d(TAG, "SENT FIRST MESSAGE IN QUICK MODE");
-                                mPayloadHelper.updateIVWithEncryptedData(firstQuickModeMsg);
-                                while (readMessage(packet, tunnel)) {
-                                    packet.position(0);
-
-                                    ResponseQuickModeFirst response = new ResponseQuickModeFirst(packet);
-                                    Log.e(TAG, "read quick mode second message");
-                                    if (response != null && response.isValid()) {
-                                        mPayloadHelper.setIsakmpHeader(response.isakmpHeader);
-                                        mAlgorithmUtil.setIv(response.getNextIv());
-
-                                        packet.clear();
-                                        byte[] responderNonce = ((PayloadNonce)response.payloadList.get(2)).nonceData;
-                                        byte[] outboundSPI = ((PayloadSA)response.payloadList.get(1)).payloadProposal.spiData;
-                                        KeyExchangeUtil.getInstance().prepareKeyMaterial(responderNonce, outboundSPI);
-                                        byte[] lastMsg = mPayloadHelper.preparePhase2QuickModeSecondMsg();
-                                        packet.put(lastMsg).flip();
-                                        if (sendMessage(packet, tunnel)) {
-                                            saRefreshed = true;
-                                            Log.d(TAG, "Sent last message in quick mode");
-                                        }
-                                        break;
-                                    }
-                                }
-
-                            }
-
-                            if (!saRefreshed) {
+                            if (!doQuickMode(packet, tunnel))
                                 break;
-                            }
 
                         }
                     }
@@ -675,6 +628,45 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
         fileDescriptor = builder.setSession(mServerAddress)
 //                .setConfigureIntent(configureIntent)
                 .establish();
+    }
+
+    private boolean doQuickMode(ByteBuffer packet, DatagramChannel tunnel) {
+        boolean success = false;
+
+        byte[] firstQuickModeMsg = mPayloadHelper.preparePhase2QuickModeFirstMsg();
+        KeyExchangeUtil.getInstance().print("Refresh SA", firstQuickModeMsg);
+        packet.clear();
+        packet.put(firstQuickModeMsg).flip();
+        if (sendMessage(packet, tunnel)) {
+            Log.d(TAG, "SENT FIRST MESSAGE IN QUICK MODE");
+            mPayloadHelper.updateIVWithEncryptedData(firstQuickModeMsg);
+            while (readMessage(packet, tunnel)) {
+                packet.position(0);
+
+                ResponseQuickModeFirst response = new ResponseQuickModeFirst(packet);
+                Log.e(TAG, "read quick mode second message");
+                if (response != null && response.isValid()) {
+                    mPayloadHelper.setIsakmpHeader(response.isakmpHeader);
+                    mAlgorithmUtil.setIv(response.getNextIv());
+
+                    packet.clear();
+                    byte[] responderNonce = ((PayloadNonce)response.payloadList.get(2)).nonceData;
+                    byte[] outboundSPI = ((PayloadSA)response.payloadList.get(1)).payloadProposal.spiData;
+                    KeyExchangeUtil.getInstance().prepareKeyMaterial(responderNonce, outboundSPI);
+                    byte[] lastMsg = mPayloadHelper.preparePhase2QuickModeSecondMsg();
+                    packet.put(lastMsg).flip();
+                    if (sendMessage(packet, tunnel)) {
+                        success = true;
+                        Log.d(TAG, "Sent last message in quick mode");
+                    }
+                    break;
+                }
+            }
+
+        }
+
+        return success;
+
     }
 
 }
