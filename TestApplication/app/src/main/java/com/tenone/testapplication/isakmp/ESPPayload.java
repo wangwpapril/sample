@@ -16,6 +16,7 @@ public class ESPPayload {
     public byte[] nextHeader;
     public byte[] payload;
 
+    public static final int ICV_SIZE = 16;
     private static final String TAG = "ESPPayload";
 
 
@@ -38,14 +39,14 @@ public class ESPPayload {
         buffer.get(encryptedData, 0, encryptedDataLength);
 
 //        ICV = new byte[12];
-//        buffer.get(ICV, 0, 12);
+//        buffer.get(ICV, 0, ICV_SIZE);
 
-//        byte[] dataBeforeICV = new byte[buffer.limit() - 12];
+//        byte[] dataBeforeICV = new byte[buffer.limit() - ICV_SIZE];
 //        buffer.position(0);
 //        buffer.get(dataBeforeICV, 0, dataBeforeICV.length);
 //        byte[] fullICVBytes = AlgorithmUtil.getInstance().hashDataWithKey(KeyExchangeUtil.getInstance().getInboundAuthenticationKey(),
 //                dataBeforeICV);
-//        byte[] dataForCompareICV = Arrays.copyOfRange(fullICVBytes, 0, 12);
+//        byte[] dataForCompareICV = Arrays.copyOfRange(fullICVBytes, 0, ICV_SIZE);
 //       if (Arrays.equals(dataForCompareICV, ICV)) {
 ////            Log.d(TAG, "Incoming packet has been verified");
 //        } else {

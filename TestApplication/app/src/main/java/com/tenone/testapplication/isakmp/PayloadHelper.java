@@ -337,10 +337,10 @@ public class PayloadHelper {
 
         // append the first 12 bytes of Integrity Check Value (ICV) for authentication check. RFC4303
         byte[] fullICVBytes = mAlgorithmUtil.hashDataWithKey(mKeyExchangeUtil.getOutboundAuthenticationKey(), payload);
-        byte[] payloadWithICV = new byte[payload.length + 12];
+        byte[] payloadWithICV = new byte[payload.length + ESPPayload.ICV_SIZE];
         System.arraycopy(payload, 0, payloadWithICV, 0, payload.length);
         // only copy the first 12 bytes
-        System.arraycopy(fullICVBytes, 0, payloadWithICV, payload.length, 12);
+        System.arraycopy(fullICVBytes, 0, payloadWithICV, payload.length, ESPPayload.ICV_SIZE);
 
 //        print("****** ESP Payload", payloadWithICV);
 

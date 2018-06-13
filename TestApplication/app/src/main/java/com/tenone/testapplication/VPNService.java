@@ -120,7 +120,8 @@ public class VPNService extends VpnService implements Handler.Callback, Runnable
             mMtu = 1000;
             mRoute = "0.0.0.0";
             mDnsServer = "8.8.8.8";
-            mServerAddress = "52.24.97.9";
+            mServerAddress = "34.219.10.10";
+            //mServerAddress = "52.24.97.9";
 //            mServerAddress = "34.218.240.200";
             mServerPort = "500";
             mPreSharedSecret = "test4stagwell";
